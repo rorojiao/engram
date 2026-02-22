@@ -333,26 +333,38 @@ def recent(
     days: int = typer.Option(3, "--days", "-d", help="最近几天"),
     limit: int = typer.Option(10, "--limit", "-n", help="最多显示条数"),
     summary: bool = typer.Option(False, "--summary", help="精简摘要模式（适合注入 context）"),
+    all_sessions: bool = typer.Option(False, "--all", help="显示包括系统/heartbeat会话"),
 ):
     """显示最近的会话记录（按时间倒序）。"""
     from engram.storage.db import list_sessions
+    from engram.extractor_facts import _is_noise, SKIP_PROJECT_DIRS
     from datetime import datetime, timedelta
+    import os
 
-    sessions = list_sessions(limit=limit * 3)  # 多取一些再过滤
+    sessions = list_sessions(limit=limit * 5)
     cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
-    
+
     recent_sessions = [
         s for s in sessions
         if (s.get("imported_at") or s.get("created_at") or "") >= cutoff
-    ][:limit]
+    ]
+
+    if not all_sessions:
+        # 过滤噪声（heartbeat/cron/system sessions）
+        recent_sessions = [
+            s for s in recent_sessions
+            if not _is_noise(s.get("title") or "")
+            and os.path.basename((s.get("project") or "").rstrip("/")) not in SKIP_PROJECT_DIRS
+        ]
+
+    recent_sessions = recent_sessions[:limit]
 
     if not recent_sessions:
-        console.print(f"[dim]最近 {days} 天没有会话记录[/dim]")
+        console.print(f"[dim]最近 {days} 天没有有效会话（heartbeat/cron 已过滤，加 --all 查看全部）[/dim]")
         return
 
     if summary:
-        # 精简模式：输出 Markdown，适合粘贴进 context
-        lines = [f"## 最近 {days} 天会话摘要（共 {len(recent_sessions)} 条）", ""]
+        lines = [f"## 最近 {days} 天会话（{len(recent_sessions)} 条）", ""]
         for s in recent_sessions:
             ts = (s.get("created_at") or s.get("imported_at") or "")[:10]
             title = (s.get("title") or "")[:70]
@@ -375,7 +387,7 @@ def recent(
             proj = (s.get("project") or "").split("/")[-1]
             table.add_row(ts, tool, proj, title)
         console.print(table)
-        console.print(f"\n共 {len(recent_sessions)} 条（最近 {days} 天）")
+        console.print(f"\n共 {len(recent_sessions)} 条（最近 {days} 天，噪声已过滤）")
 
 
 @app.command("forget")
