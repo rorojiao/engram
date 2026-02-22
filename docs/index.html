@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Engram — Shared Memory for AI Coding Agents</title>
+<meta name="description" content="Stop losing context when switching between Claude Code, Cursor, OpenCode, and OpenClaw. Engram gives all your AI tools a shared memory.">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0a0a1a;color:#e0e0f0;line-height:1.6}
+a{color:#8b5cf6;text-decoration:none}
+a:hover{color:#a78bfa}
+
+.hero{text-align:center;padding:100px 20px 80px;background:linear-gradient(135deg,#0a0a1a 0%,#1a0a3a 50%,#0a1a2a 100%)}
+.hero h1{font-size:4rem;margin-bottom:0.5rem}
+.hero .emoji{font-size:5rem;display:block;margin-bottom:20px}
+.hero .subtitle{font-size:1.4rem;color:#a0a0c0;max-width:600px;margin:0 auto 40px}
+.hero .tagline{font-size:1rem;color:#707090;margin-bottom:40px}
+
+.install-box{background:#1a1a2e;border:1px solid #333;border-radius:12px;display:inline-flex;align-items:center;padding:12px 20px;gap:12px;font-family:'Fira Code',monospace;font-size:1.1rem;margin-bottom:20px;cursor:pointer;transition:border-color .2s}
+.install-box:hover{border-color:#8b5cf6}
+.install-box code{color:#06b6d4}
+.install-box .copy{color:#666;font-size:0.8rem}
+
+.features{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:24px;max-width:1000px;margin:0 auto;padding:60px 20px}
+.card{background:#12122a;border:1px solid #222;border-radius:16px;padding:32px;transition:transform .2s,border-color .2s}
+.card:hover{transform:translateY(-4px);border-color:#8b5cf6}
+.card .icon{font-size:2.5rem;margin-bottom:16px}
+.card h3{font-size:1.2rem;margin-bottom:8px;color:#fff}
+.card p{color:#888;font-size:0.95rem}
+
+.tools{text-align:center;padding:60px 20px}
+.tools h2{font-size:2rem;margin-bottom:30px}
+.tool-badges{display:flex;flex-wrap:wrap;justify-content:center;gap:16px;max-width:700px;margin:0 auto}
+.badge{background:#1a1a2e;border:1px solid #333;border-radius:999px;padding:8px 20px;font-size:0.95rem;color:#ccc}
+
+.pricing{text-align:center;padding:80px 20px;background:#0d0d20}
+.pricing h2{font-size:2rem;margin-bottom:40px}
+.plans{display:flex;flex-wrap:wrap;justify-content:center;gap:24px}
+.plan{background:#12122a;border:1px solid #222;border-radius:16px;padding:40px;width:300px;text-align:center}
+.plan.pro{border-color:#8b5cf6}
+.plan h3{font-size:1.3rem;margin-bottom:8px}
+.plan .price{font-size:2.5rem;font-weight:bold;color:#fff;margin:16px 0}
+.plan .price span{font-size:1rem;color:#888}
+.plan ul{list-style:none;text-align:left;margin:20px 0}
+.plan ul li{padding:6px 0;color:#aaa}
+.plan ul li::before{content:'✓ ';color:#06b6d4}
+.btn{display:inline-block;padding:12px 32px;border-radius:999px;font-size:1rem;font-weight:600;transition:all .2s;margin-top:20px}
+.btn-primary{background:linear-gradient(135deg,#8b5cf6,#06b6d4);color:#fff}
+.btn-primary:hover{opacity:0.9;transform:scale(1.02);color:#fff}
+.btn-outline{border:1px solid #444;color:#ccc}
+.btn-outline:hover{border-color:#8b5cf6;color:#fff}
+
+footer{text-align:center;padding:40px;color:#555;font-size:0.9rem}
+footer a{color:#666}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <span class="emoji">🧠</span>
+  <h1>Engram</h1>
+  <p class="subtitle">Shared memory for your AI coding agents</p>
+  <p class="tagline">Stop losing context when switching between Claude Code, Cursor, OpenCode, and OpenClaw.</p>
+  <div class="install-box" onclick="navigator.clipboard.writeText('pip install engram-mcp');this.querySelector('.copy').textContent='Copied!'">
+    <code>pip install engram-mcp</code>
+    <span class="copy">📋 Click to copy</span>
+  </div>
+  <br><br>
+  <a href="https://github.com/rorojiao/engram" class="btn btn-primary">⭐ View on GitHub</a>
+</div>
+
+<div class="features">
+  <div class="card">
+    <div class="icon">🔍</div>
+    <h3>Search Everything</h3>
+    <p>Full-text search across all your AI conversations. Find that Redis fix from last week in seconds.</p>
+  </div>
+  <div class="card">
+    <div class="icon">🔄</div>
+    <h3>Auto Sync</h3>
+    <p>One command imports conversations from Claude Code, Cursor, OpenCode, and OpenClaw.</p>
+  </div>
+  <div class="card">
+    <div class="icon">🔌</div>
+    <h3>MCP Native</h3>
+    <p>Works as an MCP server. Any MCP-compatible tool can search your shared memory.</p>
+  </div>
+  <div class="card">
+    <div class="icon">🔒</div>
+    <h3>Local First</h3>
+    <p>All data stays on your machine. SQLite + FTS5. No cloud, no telemetry, no BS.</p>
+  </div>
+</div>
+
+<div class="tools">
+  <h2>Supported Tools</h2>
+  <div class="tool-badges">
+    <span class="badge">🟣 Claude Code</span>
+    <span class="badge">🟡 Cursor</span>
+    <span class="badge">🟢 OpenCode</span>
+    <span class="badge">🔵 OpenClaw</span>
+    <span class="badge">💬 ChatGPT Export 🔜</span>
+    <span class="badge">🟣 Claude Export 🔜</span>
+  </div>
+</div>
+
+<div class="pricing">
+  <h2>Pricing</h2>
+  <div class="plans">
+    <div class="plan">
+      <h3>Free & Open Source</h3>
+      <div class="price">$0<span>/forever</span></div>
+      <ul>
+        <li>All extractors</li>
+        <li>CLI & MCP Server</li>
+        <li>SQLite + FTS5 search</li>
+        <li>Unlimited local sessions</li>
+        <li>Community support</li>
+      </ul>
+      <a href="https://github.com/rorojiao/engram" class="btn btn-outline">Get Started</a>
+    </div>
+    <div class="plan pro">
+      <h3>Pro</h3>
+      <div class="price">$6.99<span>/mo</span></div>
+      <ul>
+        <li>Everything in Free</li>
+        <li>Cloud sync across machines</li>
+        <li>AI-powered summaries</li>
+        <li>Team shared memory</li>
+        <li>Priority support</li>
+      </ul>
+      <a href="#" class="btn btn-primary">Coming Soon</a>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <p>Built by <a href="https://github.com/rorojiao">@rorojiao</a> · MIT License · <a href="https://github.com/rorojiao/engram">GitHub</a></p>
+</footer>
+
+</body>
+</html>
