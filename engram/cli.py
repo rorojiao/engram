@@ -227,10 +227,10 @@ def config_backend(
 
 @app.command()
 def push():
-    """Push memory.db + context.md to configured backend."""
+    """Push memory.db + core.md + context.md to configured backend."""
     from .config import get_backend
     from .storage.memory_db import MEMORY_DB
-    from .context_gen import CONTEXT_FILE
+    from .context_gen import CONTEXT_FILE, CORE_FILE
     from pathlib import Path
 
     backend = get_backend()
@@ -238,34 +238,38 @@ def push():
         console.print("[yellow]No remote backend configured. Use: engram config-backend gitee --token <PAT> --repo owner/repo[/yellow]")
         return
 
+    sync_files = [
+        (MEMORY_DB, "memory.db"),
+        (CORE_FILE, "core.md"),
+        (CONTEXT_FILE, "context.md"),
+    ]
     ok_count = 0
-    for fpath, remote_name in [(MEMORY_DB, "memory.db"), (CONTEXT_FILE, "context.md")]:
+    for fpath, remote_name in sync_files:
         if not fpath.exists():
             console.print(f"[dim]跳过 {remote_name}（不存在）[/dim]")
             continue
         if backend.upload(fpath, remote_name=remote_name):
-            console.print(f"[green]✅ 上传 {remote_name}[/green]")
             ok_count += 1
         else:
             console.print(f"[red]❌ 上传 {remote_name} 失败[/red]")
 
     if ok_count > 0:
-        console.print(f"[green]☁️  已同步 {ok_count} 个文件到 {backend.name}[/green]")
+        console.print(f"[green]☁️  已同步 {ok_count} 个文件到 {backend.name}（memory.db + core.md + context.md）[/green]")
 
 
 @app.command()
 def pull():
-    """Pull memory.db + context.md from configured backend."""
+    """Pull memory.db + core.md + context.md from configured backend."""
     from .config import get_backend
     from .storage.memory_db import MEMORY_DB
-    from .context_gen import CONTEXT_FILE
+    from .context_gen import CONTEXT_FILE, CORE_FILE
 
     backend = get_backend()
     if backend.name == "local":
         console.print("[yellow]No remote backend configured.[/yellow]")
         return
 
-    for fpath, remote_name in [(MEMORY_DB, "memory.db"), (CONTEXT_FILE, "context.md")]:
+    for fpath, remote_name in [(MEMORY_DB, "memory.db"), (CORE_FILE, "core.md"), (CONTEXT_FILE, "context.md")]:
         if backend.download(fpath, remote_name=remote_name):
             console.print(f"[green]✅ 下载 {remote_name}[/green]")
         else:
@@ -307,25 +311,37 @@ def list_fact_cmd(
 
 @app.command("context")
 def context_cmd(
-    update: bool = typer.Option(False, "--update", help="重新生成 context.md 文件"),
-    show: bool = typer.Option(False, "--show", help="显示当前 context.md 内容"),
+    update: bool = typer.Option(False, "--update", help="重新生成所有 context 文件"),
+    show: bool = typer.Option(False, "--show", help="显示完整 context.md"),
+    core: bool = typer.Option(False, "--core", help="只显示 core.md（@include 加载的极小核心）"),
 ):
-    """管理 context.md 文件（用于文件注入）。"""
-    from engram.context_gen import update_context_files, CONTEXT_FILE
+    """管理 context 文件（Layer1 core.md + Layer2 context.md）。"""
+    from engram.context_gen import update_context_files, CONTEXT_FILE, CORE_FILE
 
     if update:
         results = update_context_files()
-        console.print("✅ context.md 已更新：")
+        console.print("✅ context 文件已更新：")
         for r in results:
             console.print(f"   {r}")
-        console.print(f"\n📄 全局文件：{CONTEXT_FILE}")
+        console.print(f"\n📌 核心文件（@include 用）：{CORE_FILE}")
+        console.print(f"📄 完整摘要：{CONTEXT_FILE}")
+    elif core:
+        if CORE_FILE.exists():
+            content = CORE_FILE.read_text()
+            console.print(f"[dim]core.md ({len(content)} chars ≈ {len(content)//4} token):[/dim]\n")
+            console.print(content)
+        else:
+            console.print("[dim]core.md 不存在，请先运行 engram context --update[/dim]")
     elif show:
         if CONTEXT_FILE.exists():
             console.print(CONTEXT_FILE.read_text())
         else:
             console.print("[dim]context.md 不存在，请先运行 engram context --update[/dim]")
     else:
-        console.print("用法：engram context --update  或  engram context --show")
+        console.print("用法：")
+        console.print("  engram context --update    重新生成所有文件")
+        console.print("  engram context --core      查看 core.md（@include 实际加载的内容）")
+        console.print("  engram context --show      查看完整 context.md")
 
 
 @app.command("recent")

@@ -1,4 +1,9 @@
-"""生成 ~/.engram/context.md，用于文件注入。token 预算 800。"""
+"""生成 ~/.engram/context.md，用于文件注入。token 预算 800。
+分层架构（MemGPT 思路）：
+  core.md     ≤100 token，只有固定规则，@include 永远加载
+  context.md  ≤800 token，全量摘要，heartbeat 更新，按需读取
+  projects/*  项目级，懒加载
+"""
 import json
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -6,9 +11,12 @@ from .storage.memory_db import list_facts, get_all_scopes
 from .storage.db import list_sessions
 
 CONTEXT_FILE = Path.home() / ".engram" / "context.md"
+CORE_FILE = Path.home() / ".engram" / "core.md"   # Layer 1：永远小于 100 token
 PROJECT_CONTEXT_DIR = Path.home() / ".engram" / "projects"
 
+# 每个区块字符上限（1 token ≈ 4 chars）
 BUDGET_CHARS = {
+    "core": 400,         # Layer 1：≤100 token，只有 pinned 规则
     "global_pinned": 800,
     "project_facts": 1600,
     "recent_activity": 800,
@@ -17,6 +25,23 @@ BUDGET_CHARS = {
 def _format_fact(f: dict) -> str:
     pin = "📌 " if f["pinned"] else ""
     return f"- {pin}{f['content']}"
+
+def generate_core_context() -> str:
+    """Layer 1：只包含 pinned 规则，严格 ≤400 chars（≈100 token）。
+    这是 @include 永远加载的最小核心，绝不超限。"""
+    pinned = list_facts(scope="global", pinned_only=True)
+    if not pinned:
+        return "<!-- engram core: no pinned rules yet. Run: engram remember 'rule' --scope global --pin -->"
+    
+    lines = ["<!-- engram core memory -->"]
+    chars = 0
+    for f in pinned:
+        line = _format_fact(f)
+        if chars + len(line) > BUDGET_CHARS["core"]:
+            break
+        lines.append(line)
+        chars += len(line)
+    return "\n".join(lines)
 
 def generate_global_context() -> str:
     lines = ["## Engram 全局记忆（自动更新）", f"_更新时间：{datetime.now().strftime('%Y-%m-%d %H:%M')}_", ""]
@@ -111,10 +136,18 @@ def generate_project_context(project_name: str) -> str:
 
 def update_context_files():
     results = []
+
+    # Layer 1: core.md（永远小，只有 pinned 规则，供 @include 使用）
+    core_content = generate_core_context()
+    _atomic_write(CORE_FILE, core_content)
+    results.append(f"core: {len(core_content)} chars ({len(core_content)//4} token)")
+
+    # Layer 2: context.md（全量摘要，heartbeat 更新，不用 @include）
     global_content = generate_global_context()
     _atomic_write(CONTEXT_FILE, global_content)
-    results.append(f"global: {len(global_content)} chars")
+    results.append(f"context: {len(global_content)} chars")
 
+    # Layer 2.5: 项目级 context.md（懒加载）
     scopes = get_all_scopes()
     for scope in scopes:
         if not scope.startswith("project:"):
@@ -125,7 +158,7 @@ def update_context_files():
             proj_dir = PROJECT_CONTEXT_DIR / proj_name
             proj_dir.mkdir(parents=True, exist_ok=True)
             _atomic_write(proj_dir / "context.md", content)
-            results.append(f"{proj_name}: {len(content)} chars")
+            results.append(f"project/{proj_name}: {len(content)} chars")
 
     return results
 
