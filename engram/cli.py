@@ -28,13 +28,16 @@ def sync(verbose: bool = typer.Option(False, "--verbose", "-v")):
     total = 0
     for extractor in extractors:
         count = 0
-        with console.status(f"Syncing {extractor.name}..."):
-            for session in extractor.extract_sessions():
-                upsert_session(session)
-                count += 1
-                if verbose:
-                    console.print(f"  [dim]{session['title'][:60]}[/dim]")
-        console.print(f"  ✅ {extractor.name}: {count} sessions")
+        try:
+            with console.status(f"Syncing {extractor.name}..."):
+                for session in extractor.extract_sessions():
+                    upsert_session(session)
+                    count += 1
+                    if verbose:
+                        console.print(f"  [dim]{session['title'][:60]}[/dim]")
+            console.print(f"  ✅ {extractor.name}: {count} sessions")
+        except Exception as e:
+            console.print(f"  [red]⚠️ {extractor.name} 出错（已跳过）: {e}[/red]")
         total += count
     
     console.print(f"\n[bold green]✨ Done! Imported {total} sessions total.[/bold green]")
