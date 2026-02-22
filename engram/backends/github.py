@@ -108,44 +108,27 @@ class GiteeBackend(BaseBackend):
             print(f"Upload {remote_name} failed: {e}")
             return False
 
-    def upload(self, local_path: Path) -> bool:
-        # Also upload sync_files from config
-        import json
-        from pathlib import Path as P
-        config_path = P.home() / ".engram" / "config.json"
-        sync_files = []
-        try:
-            cfg = json.loads(config_path.read_text())
-            sync_files = cfg.get("sync_files", [])
-        except:
-            pass
+    def upload(self, local_path: Path, remote_name: str = None) -> bool:
+        """上传单个文件。remote_name 指定远端文件名。"""
+        fname = remote_name or local_path.name
+        return self._upload_file(local_path, fname)
 
-        success = True
-        if sync_files:
-            engram_dir = P.home() / ".engram"
-            for fname in sync_files:
-                fpath = engram_dir / fname
-                if fpath.exists():
-                    if not self._upload_file(fpath, fname):
-                        success = False
-        else:
-            # Fallback: upload engram.db
-            success = self._upload_file(local_path, self.filename)
-        return success
-
-    def download(self, local_path: Path) -> bool:
+    def download(self, local_path: Path, remote_name: str = None) -> bool:
+        """下载单个文件。remote_name 指定远端文件名。"""
+        fname = remote_name or self.filename
         try:
             r = requests.get(
-                f"{self.api_base}/repos/{self.repo}/contents/{self.filename}",
+                f"{self.api_base}/repos/{self.repo}/contents/{fname}",
                 params=self._params(), timeout=15
             )
             if r.status_code != 200:
                 return False
             content = base64.b64decode(r.json()["content"].replace("\n", ""))
+            local_path.parent.mkdir(parents=True, exist_ok=True)
             local_path.write_bytes(content)
             return True
         except Exception as e:
-            print(f"Download failed: {e}")
+            print(f"Download {fname} failed: {e}")
             return False
 
     def test_connection(self) -> bool:

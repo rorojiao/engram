@@ -227,32 +227,49 @@ def config_backend(
 
 @app.command()
 def push():
-    """Push local database to configured backend."""
+    """Push memory.db + context.md to configured backend."""
     from .config import get_backend
-    from .storage.db import DB_PATH
+    from .storage.memory_db import MEMORY_DB
+    from .context_gen import CONTEXT_FILE
+    from pathlib import Path
+
     backend = get_backend()
     if backend.name == "local":
-        console.print("[yellow]No remote backend configured. Use: engram config-backend <backend>[/yellow]")
+        console.print("[yellow]No remote backend configured. Use: engram config-backend gitee --token <PAT> --repo owner/repo[/yellow]")
         return
-    if backend.upload(DB_PATH):
-        console.print(f"[green]✅ Pushed to {backend.name}[/green]")
-    else:
-        console.print(f"[red]❌ Push to {backend.name} failed[/red]")
+
+    ok_count = 0
+    for fpath, remote_name in [(MEMORY_DB, "memory.db"), (CONTEXT_FILE, "context.md")]:
+        if not fpath.exists():
+            console.print(f"[dim]跳过 {remote_name}（不存在）[/dim]")
+            continue
+        if backend.upload(fpath, remote_name=remote_name):
+            console.print(f"[green]✅ 上传 {remote_name}[/green]")
+            ok_count += 1
+        else:
+            console.print(f"[red]❌ 上传 {remote_name} 失败[/red]")
+
+    if ok_count > 0:
+        console.print(f"[green]☁️  已同步 {ok_count} 个文件到 {backend.name}[/green]")
 
 
 @app.command()
 def pull():
-    """Pull database from configured backend."""
+    """Pull memory.db + context.md from configured backend."""
     from .config import get_backend
-    from .storage.db import DB_PATH
+    from .storage.memory_db import MEMORY_DB
+    from .context_gen import CONTEXT_FILE
+
     backend = get_backend()
     if backend.name == "local":
-        console.print("[yellow]No remote backend configured. Use: engram config-backend <backend>[/yellow]")
+        console.print("[yellow]No remote backend configured.[/yellow]")
         return
-    if backend.download(DB_PATH):
-        console.print(f"[green]✅ Pulled from {backend.name}[/green]")
-    else:
-        console.print(f"[red]❌ Pull from {backend.name} failed[/red]")
+
+    for fpath, remote_name in [(MEMORY_DB, "memory.db"), (CONTEXT_FILE, "context.md")]:
+        if backend.download(fpath, remote_name=remote_name):
+            console.print(f"[green]✅ 下载 {remote_name}[/green]")
+        else:
+            console.print(f"[dim]⏭ {remote_name} 未找到（跳过）[/dim]")
 
 
 @app.command("facts")
@@ -309,6 +326,68 @@ def context_cmd(
             console.print("[dim]context.md 不存在，请先运行 engram context --update[/dim]")
     else:
         console.print("用法：engram context --update  或  engram context --show")
+
+
+@app.command("recent")
+def recent(
+    days: int = typer.Option(3, "--days", "-d", help="最近几天"),
+    limit: int = typer.Option(10, "--limit", "-n", help="最多显示条数"),
+    summary: bool = typer.Option(False, "--summary", help="精简摘要模式（适合注入 context）"),
+):
+    """显示最近的会话记录（按时间倒序）。"""
+    from engram.storage.db import list_sessions
+    from datetime import datetime, timedelta
+
+    sessions = list_sessions(limit=limit * 3)  # 多取一些再过滤
+    cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
+    
+    recent_sessions = [
+        s for s in sessions
+        if (s.get("imported_at") or s.get("created_at") or "") >= cutoff
+    ][:limit]
+
+    if not recent_sessions:
+        console.print(f"[dim]最近 {days} 天没有会话记录[/dim]")
+        return
+
+    if summary:
+        # 精简模式：输出 Markdown，适合粘贴进 context
+        lines = [f"## 最近 {days} 天会话摘要（共 {len(recent_sessions)} 条）", ""]
+        for s in recent_sessions:
+            ts = (s.get("created_at") or s.get("imported_at") or "")[:10]
+            title = (s.get("title") or "")[:70]
+            tool = s.get("source_tool", "")
+            proj = s.get("project", "")
+            proj_name = proj.split("/")[-1] if proj else ""
+            lines.append(f"- [{ts}] `{tool}` **{title}**" + (f"（{proj_name}）" if proj_name else ""))
+        console.print("\n".join(lines))
+    else:
+        from rich.table import Table
+        table = Table(show_header=True, header_style="bold cyan")
+        table.add_column("时间", width=12)
+        table.add_column("工具", width=12)
+        table.add_column("项目", width=15)
+        table.add_column("标题", width=45)
+        for s in recent_sessions:
+            ts = (s.get("created_at") or s.get("imported_at") or "")[:10]
+            title = (s.get("title") or "")[:45]
+            tool = s.get("source_tool", "")
+            proj = (s.get("project") or "").split("/")[-1]
+            table.add_row(ts, tool, proj, title)
+        console.print(table)
+        console.print(f"\n共 {len(recent_sessions)} 条（最近 {days} 天）")
+
+
+@app.command("forget")
+def forget(
+    fact_id: str = typer.Argument(help="要删除的 fact ID（来自 engram facts）"),
+):
+    """删除一条记忆 fact。"""
+    from engram.storage.memory_db import delete_fact
+    if delete_fact(fact_id):
+        console.print(f"✅ 已删除：{fact_id}")
+    else:
+        console.print(f"[yellow]未找到：{fact_id}[/yellow]")
 
 
 if __name__ == "__main__":
