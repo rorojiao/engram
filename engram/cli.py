@@ -344,14 +344,18 @@ def status_cmd():
             from datetime import datetime
             age = datetime.now() - datetime.fromtimestamp(mtime)
             age_str = f"{int(age.total_seconds()//60)}min ago" if age.total_seconds() < 3600 else f"{int(age.total_seconds()//3600)}h ago"
-            token_hint = f" (~{size//4} token)" if label.endswith(".md") else ""
+            if label.endswith(".md"):
+                char_count = len(path.read_text(encoding="utf-8"))
+                token_hint = f" (~{char_count//4} token)"
+            else:
+                token_hint = ""
             console.print(f"   {label:<15} {size:>7} bytes  updated {age_str}{token_hint}")
         else:
             console.print(f"   {label:<15} [dim]not found[/dim]")
 
     # ── core.md 大小警告 ──
     if CORE_FILE.exists():
-        tokens = CORE_FILE.stat().st_size // 4
+        tokens = len(CORE_FILE.read_text(encoding="utf-8")) // 4
         if tokens > 80:
             console.print(f"   [yellow]⚠️  core.md {tokens} token，接近 100 token 上限！[/yellow]")
 
