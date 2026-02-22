@@ -19,16 +19,29 @@ engram search "redis connection"   # find anything across all tools
 engram config                      # get MCP config snippet
 ```
 
-## Supported Tools
+## Supported Platforms
 
-| Tool | Status | Data Source |
-|------|--------|-------------|
-| 🟣 Claude Code | ✅ | `~/.claude/projects/*.jsonl` |
-| 🔵 OpenClaw | ✅ | `~/.openclaw/*.db` |
-| 🟢 OpenCode | ✅ | `~/.opencode/**/*.db` |
-| 🟡 Cursor | ✅ | App data SQLite |
-| 💬 ChatGPT Export | 🔜 | JSON export |
-| 🟣 Claude Export | 🔜 | JSON export |
+### Web AI (Chrome Extension)
+| Platform | URL | Import | Live Snapshot |
+|----------|-----|--------|--------------|
+| ChatGPT | chat.openai.com | ✅ Official ZIP | ✅ |
+| Claude | claude.ai | ✅ Official JSON | ✅ |
+| Gemini | gemini.google.com | - | ✅ |
+| Perplexity | perplexity.ai | - | ✅ |
+| Grok | grok.x.com | - | ✅ |
+| DeepSeek | chat.deepseek.com | ✅ JSON | ✅ |
+| 豆包 Doubao | doubao.com/chat | ✅ Markdown | ✅ |
+| 千问 Qwen | chat.qwen.ai | - | ✅ |
+| 通义 Tongyi | tongyi.aliyun.com | - | ✅ |
+
+### Coding Tools (Python CLI)
+| Tool | Path | Notes |
+|------|------|-------|
+| Claude Code | ~/.claude/projects | JSONL |
+| OpenClaw | ~/.openclaw/agents | JSONL |
+| OpenCode | ~/.opencode | SQLite |
+| Cursor | App Data | SQLite |
+| Codex CLI | ~/.codex | - |
 
 ## MCP Tools
 

@@ -1,0 +1,62 @@
+{
+  "manifest_version": 3,
+  "name": "Engram — AI Memory Bridge",
+  "version": "0.1.0",
+  "description": "Save AI conversations to your Google Drive. Private, open-source, works with 9 AI platforms.",
+  "permissions": ["activeTab", "storage", "identity"],
+  "host_permissions": [
+    "https://chat.openai.com/*",
+    "https://claude.ai/*",
+    "https://gemini.google.com/*",
+    "https://perplexity.ai/*",
+    "https://grok.x.com/*",
+    "https://chat.deepseek.com/*",
+    "https://www.doubao.com/*",
+    "https://chat.qwen.ai/*",
+    "https://tongyi.aliyun.com/*"
+  ],
+  "oauth2": {
+    "client_id": "PLACEHOLDER_CLIENT_ID",
+    "scopes": ["https://www.googleapis.com/auth/drive.file"]
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://chat.openai.com/*"],
+      "js": ["content-scripts/base-extractor.js", "content-scripts/chatgpt.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://claude.ai/*"],
+      "js": ["content-scripts/base-extractor.js", "content-scripts/claude.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://chat.deepseek.com/*"],
+      "js": ["content-scripts/base-extractor.js", "content-scripts/deepseek.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://www.doubao.com/*"],
+      "js": ["content-scripts/base-extractor.js", "content-scripts/doubao.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://chat.qwen.ai/*", "https://tongyi.aliyun.com/*"],
+      "js": ["content-scripts/base-extractor.js", "content-scripts/qwen.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://gemini.google.com/*"],
+      "js": ["content-scripts/base-extractor.js", "content-scripts/gemini.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://perplexity.ai/*"],
+      "js": ["content-scripts/base-extractor.js", "content-scripts/perplexity.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {"service_worker": "background.js"},
+  "action": {"default_popup": "popup.html"},
+  "icons": {"128": "icons/icon128.png"}
+}

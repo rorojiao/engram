@@ -1,92 +1,86 @@
-"""Extract conversations from OpenClaw (~/.openclaw/ SQLite)."""
+"""Extract conversations from OpenClaw (~/.openclaw/agents/*/sessions/*.jsonl)."""
 import json
-import sqlite3
 from pathlib import Path
 from typing import Iterator
 from .base import BaseExtractor
 
-OPENCLAW_DIR = Path.home() / ".openclaw"
+OPENCLAW_DIR = Path.home() / ".openclaw" / "agents"
 
 class OpenClawExtractor(BaseExtractor):
     name = "openclaw"
     
     def is_available(self) -> bool:
-        return any(OPENCLAW_DIR.glob("*.db")) or (OPENCLAW_DIR / "sessions.db").exists()
-    
-    def _find_db(self) -> Path | None:
-        for db_file in OPENCLAW_DIR.glob("*.db"):
-            return db_file
-        sessions_db = OPENCLAW_DIR / "sessions.db"
-        if sessions_db.exists():
-            return sessions_db
-        return None
+        return OPENCLAW_DIR.exists() and any(OPENCLAW_DIR.glob("*/sessions/*.jsonl"))
     
     def extract_sessions(self) -> Iterator[dict]:
-        db_path = self._find_db()
-        if not db_path:
+        if not self.is_available():
             return
         
-        try:
-            conn = sqlite3.connect(str(db_path))
-            conn.row_factory = sqlite3.Row
-            
-            tables = [r[0] for r in conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            ).fetchall()]
-            
-            if "sessions" in tables or "conversation" in tables:
-                table = "sessions" if "sessions" in tables else "conversation"
-                try:
-                    sessions = conn.execute(
-                        f"SELECT * FROM {table} ORDER BY created_at DESC LIMIT 200"
-                    ).fetchall()
+        for jsonl_file in sorted(OPENCLAW_DIR.glob("*/sessions/*.jsonl"), 
+                                  key=lambda f: f.stat().st_mtime, reverse=True):
+            try:
+                messages = []
+                session_meta = {}
+                
+                for line in jsonl_file.read_text(encoding="utf-8", errors="replace").splitlines():
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        entry = json.loads(line)
+                    except:
+                        continue
                     
-                    for row in sessions:
-                        s = dict(row)
-                        session_id = self.make_session_id("openclaw", str(s.get("id", s.get("key", ""))))
+                    entry_type = entry.get("type", "")
+                    
+                    if entry_type == "session":
+                        session_meta = entry
+                    
+                    elif entry_type == "message":
+                        msg = entry.get("message", {})
+                        role = msg.get("role", "")
+                        if role not in ("user", "assistant"):
+                            continue
                         
-                        messages = []
-                        if "messages" in tables:
-                            msg_rows = conn.execute(
-                                "SELECT role, content, created_at FROM messages WHERE session_id = ? ORDER BY id",
-                                (s.get("id", s.get("key", "")),)
-                            ).fetchall()
-                            for m in msg_rows:
-                                messages.append({
-                                    "role": m["role"],
-                                    "content": str(m["content"])[:4000],
-                                    "timestamp": m.get("created_at", ""),
-                                })
+                        content = msg.get("content", "")
+                        if isinstance(content, list):
+                            text_parts = []
+                            for block in content:
+                                if isinstance(block, dict) and block.get("type") == "text":
+                                    text_parts.append(block.get("text", ""))
+                            content = "\n".join(text_parts)
                         
-                        if not messages and "history" in s:
-                            try:
-                                history = json.loads(s["history"]) if isinstance(s["history"], str) else s["history"]
-                                for m in (history or []):
-                                    if isinstance(m, dict) and m.get("role") in ("user", "assistant"):
-                                        messages.append({
-                                            "role": m["role"],
-                                            "content": str(m.get("content",""))[:4000],
-                                            "timestamp": "",
-                                        })
-                            except:
-                                pass
+                        if not content or not str(content).strip():
+                            continue
                         
-                        first_user = next((m["content"] for m in messages if m["role"] == "user"), "")
-                        
-                        yield {
-                            "id": session_id,
-                            "source_tool": "openclaw",
-                            "source_path": str(db_path),
-                            "project": s.get("channel", s.get("label", "")),
-                            "title": s.get("label", s.get("title", first_user[:80])),
-                            "summary": "",
-                            "created_at": s.get("created_at", ""),
-                            "messages": messages,
-                            "tags": [],
-                        }
-                except Exception:
-                    pass
-            
-            conn.close()
-        except Exception:
-            pass
+                        messages.append({
+                            "role": role,
+                            "content": str(content)[:5000],
+                            "timestamp": entry.get("timestamp", ""),
+                        })
+                
+                if not messages:
+                    continue
+                
+                # Filter: skip heartbeat/cron sessions (too much noise)
+                first_user = next((m["content"] for m in messages if m["role"] == "user"), "")
+                if first_user.startswith("[cron:") or first_user.startswith("[heartbeat"):
+                    continue
+                
+                session_id = self.make_session_id("openclaw", str(jsonl_file))
+                
+                first_asst = next((m["content"] for m in messages if m["role"] == "assistant"), "")
+                
+                yield {
+                    "id": session_id,
+                    "source_tool": "openclaw",
+                    "source_path": str(jsonl_file),
+                    "project": session_meta.get("cwd", ""),
+                    "title": first_user[:100] if first_user else jsonl_file.stem,
+                    "summary": first_asst[:200] if first_asst else "",
+                    "created_at": session_meta.get("timestamp", ""),
+                    "messages": messages,
+                    "tags": [],
+                }
+            except Exception:
+                continue

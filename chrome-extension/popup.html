@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { width: 320px; font-family: -apple-system, sans-serif; margin: 0; background: #0f0f23; color: #e2e8f0; }
+    .header { background: linear-gradient(135deg, #6366f1, #8b5cf6); padding: 16px; }
+    .header h1 { margin: 0; font-size: 18px; }
+    .header p { margin: 4px 0 0; font-size: 12px; opacity: 0.8; }
+    .sessions { padding: 12px; max-height: 300px; overflow-y: auto; }
+    .session { background: #1e1e3a; border-radius: 8px; padding: 10px; margin-bottom: 8px; font-size: 12px; }
+    .session .platform { color: #6366f1; font-weight: bold; font-size: 11px; }
+    .session .title { margin-top: 4px; }
+    .empty { text-align: center; padding: 20px; color: #64748b; }
+    .footer { padding: 12px; border-top: 1px solid #1e1e3a; font-size: 11px; color: #64748b; }
+    .footer a { color: #6366f1; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🧠 Engram</h1>
+    <p>AI Memory Bridge · Open Source · Privacy First</p>
+  </div>
+  <div class="sessions" id="sessions-list">
+    <div class="empty">Loading...</div>
+  </div>
+  <div class="footer">
+    <a href="https://engram.gamezipper.com" target="_blank">engram.gamezipper.com</a>
+    · Data stays in YOUR Drive
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
