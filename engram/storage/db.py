@@ -34,9 +34,7 @@ CREATE TABLE IF NOT EXISTS messages (
 CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5(
     id UNINDEXED,
     title,
-    summary,
-    content='sessions',
-    content_rowid='rowid'
+    summary
 );
 
 CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
@@ -84,6 +82,8 @@ def upsert_session(session: dict) -> str:
             VALUES (:id, :source_tool, :source_path, :project, :title, :summary, :message_count, :created_at, :tags)
         """, {**session, "tags": json.dumps(session.get("tags", [])), "message_count": len(messages)})
         
+        # Clean old messages and FTS entries
+        conn.execute("DELETE FROM messages_fts WHERE session_id = ?", (sid,))
         conn.execute("DELETE FROM messages WHERE session_id = ?", (sid,))
         for msg in messages:
             conn.execute(
@@ -93,7 +93,9 @@ def upsert_session(session: dict) -> str:
             conn.execute("INSERT INTO messages_fts (session_id, content) VALUES (?, ?)",
                         (sid, msg["content"]))
         
-        conn.execute("INSERT OR REPLACE INTO sessions_fts (id, title, summary) VALUES (?, ?, ?)",
+        # Update sessions FTS
+        conn.execute("DELETE FROM sessions_fts WHERE id = ?", (sid,))
+        conn.execute("INSERT INTO sessions_fts (id, title, summary) VALUES (?, ?, ?)",
                     (sid, session.get("title",""), session.get("summary","")))
         conn.commit()
         return sid
