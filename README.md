@@ -35,13 +35,42 @@ engram config                      # get MCP config snippet
 | 通义 Tongyi | tongyi.aliyun.com | - | ✅ |
 
 ### Coding Tools (Python CLI)
-| Tool | Path | Notes |
-|------|------|-------|
+| Tool | Path | Format |
+|------|------|--------|
 | Claude Code | ~/.claude/projects | JSONL |
 | OpenClaw | ~/.openclaw/agents | JSONL |
-| OpenCode | ~/.opencode | SQLite |
-| Cursor | App Data | SQLite |
+| OpenCode | ~/.local/share/opencode/storage/ | JSON files (ses_*.json, msg_*.json, prt_*.json) |
+| Cursor | ~/.config/Cursor/User/workspaceStorage/*/state.vscdb | SQLite (ItemTable) |
 | Codex CLI | ~/.codex | - |
+
+## Features
+
+### 🔍 Vector Semantic Search
+Engram uses [fastembed](https://github.com/qdrant/fastembed) (BAAI/bge-small-en-v1.5, 384-dim) + [sqlite-vec](https://github.com/asg017/sqlite-vec) for semantic search alongside FTS5 keyword search. Results are merged and deduplicated.
+
+```bash
+pip install engram-mcp[vector]  # installs sqlite-vec + fastembed
+engram sync                      # embeddings generated automatically
+engram search "how to fix auth"  # uses both vector + FTS5
+```
+
+### ☁️ Multi-Backend Storage
+Sync your Engram database to remote backends:
+
+```bash
+# GitHub
+engram config-backend github --token ghp_xxx --repo owner/repo
+
+# Gitee
+engram config-backend gitee --token xxx --repo owner/repo
+
+# WebDAV
+engram config-backend webdav --url https://dav.example.com --username user --password pass
+
+# Manual push/pull
+engram push
+engram pull
+```
 
 ## MCP Tools
 

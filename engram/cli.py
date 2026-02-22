@@ -202,5 +202,35 @@ def config_backend(
         console.print(f"⚠️  Backend '{backend}' configured but connection test failed")
 
 
+@app.command()
+def push():
+    """Push local database to configured backend."""
+    from .config import get_backend
+    from .storage.db import DB_PATH
+    backend = get_backend()
+    if backend.name == "local":
+        console.print("[yellow]No remote backend configured. Use: engram config-backend <backend>[/yellow]")
+        return
+    if backend.upload(DB_PATH):
+        console.print(f"[green]✅ Pushed to {backend.name}[/green]")
+    else:
+        console.print(f"[red]❌ Push to {backend.name} failed[/red]")
+
+
+@app.command()
+def pull():
+    """Pull database from configured backend."""
+    from .config import get_backend
+    from .storage.db import DB_PATH
+    backend = get_backend()
+    if backend.name == "local":
+        console.print("[yellow]No remote backend configured. Use: engram config-backend <backend>[/yellow]")
+        return
+    if backend.download(DB_PATH):
+        console.print(f"[green]✅ Pulled from {backend.name}[/green]")
+    else:
+        console.print(f"[red]❌ Pull from {backend.name} failed[/red]")
+
+
 if __name__ == "__main__":
     app()

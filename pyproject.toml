@@ -24,6 +24,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+vector = ["sqlite-vec", "fastembed"]
+github = ["requests"]
+webdav = ["webdav4"]
+all = ["sqlite-vec", "fastembed", "requests", "webdav4"]
 pro = ["sentence-transformers>=3.0.0"]
 web = ["fastapi>=0.110.0", "uvicorn>=0.29.0"]
 dev = ["pytest", "ruff"]

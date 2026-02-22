@@ -64,6 +64,11 @@ CREATE TABLE IF NOT EXISTS embeddings (
     embedding BLOB,
     source_type TEXT DEFAULT 'message'
 );
+
+CREATE VIRTUAL TABLE IF NOT EXISTS vec_embeddings USING vec0(
+    session_id TEXT,
+    embedding FLOAT[384]
+);
 """
 
 def get_db() -> sqlite3.Connection:
@@ -115,14 +120,32 @@ def upsert_session(session: dict) -> str:
                     (sid, session.get("title",""), session.get("summary","")))
         conn.commit()
         
-        # Embeddings are generated on-demand via semantic_search or explicit call
-        # Not during sync to avoid slow model loading
+        # Add vector embedding (lazy - don't fail if model not available)
+        try:
+            from .vector import add_embedding
+            # Build content from title + summary + first 2 messages
+            parts = [session.get("title", ""), session.get("summary", "")]
+            for m in messages[:2]:
+                parts.append(m.get("content", "")[:500])
+            content = " ".join(p for p in parts if p)
+            if content.strip():
+                add_embedding(sid, content)
+        except Exception:
+            pass
         
         return sid
     finally:
         conn.close()
 
 def search_sessions(query: str, tool: str = None, limit: int = 10) -> list:
+    # Try vector search first for candidate session_ids
+    vector_ids = []
+    try:
+        from .vector import vector_search
+        vector_ids = vector_search(query, limit=limit)
+    except Exception:
+        pass
+
     conn = get_db()
     try:
         params = [f'"{query}"', f'"{query}"', limit]
@@ -141,7 +164,7 @@ def search_sessions(query: str, tool: str = None, limit: int = 10) -> list:
             ORDER BY s.imported_at DESC
             LIMIT ?
         """, params).fetchall()
-        return [dict(r) for r in rows]
+        fts_results = [dict(r) for r in rows]
     except:
         q = f"%{query}%"
         rows = conn.execute("""
@@ -150,9 +173,27 @@ def search_sessions(query: str, tool: str = None, limit: int = 10) -> list:
             WHERE m.content LIKE ? OR s.title LIKE ? OR s.summary LIKE ?
             ORDER BY s.imported_at DESC LIMIT ?
         """, (q, q, q, limit)).fetchall()
-        return [dict(r) for r in rows]
+        fts_results = [dict(r) for r in rows]
     finally:
         conn.close()
+
+    # Merge vector results with FTS results (deduplicated)
+    seen = {r["id"] for r in fts_results}
+    if vector_ids:
+        conn = get_db()
+        try:
+            for vid in vector_ids:
+                if vid not in seen:
+                    row = conn.execute("SELECT * FROM sessions WHERE id = ?", (vid,)).fetchone()
+                    if row:
+                        r = dict(row)
+                        if not tool or r.get("source_tool") == tool:
+                            fts_results.append(r)
+                            seen.add(vid)
+        finally:
+            conn.close()
+
+    return fts_results[:limit]
 
 def list_sessions(tool: str = None, project: str = None, limit: int = 20) -> list:
     conn = get_db()

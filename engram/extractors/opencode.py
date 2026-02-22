@@ -1,22 +1,42 @@
 """Extract conversations from OpenCode (~/.local/share/opencode/ JSON files)."""
 import json
+import platform
 from pathlib import Path
 from datetime import datetime, timezone
 from typing import Iterator
 from .base import BaseExtractor
 
-OPENCODE_BASE = Path.home() / ".local" / "share" / "opencode" / "storage"
+
+def _find_opencode_storage() -> Path | None:
+    """Search multiple candidate paths for OpenCode storage."""
+    home = Path.home()
+    candidates = [
+        home / ".local" / "share" / "opencode" / "storage",
+        home / ".opencode" / "storage",
+    ]
+    if platform.system() == "Darwin":
+        candidates.append(home / "Library" / "Application Support" / "opencode" / "storage")
+    for c in candidates:
+        if c.exists() and (c / "session" / "global").exists():
+            return c
+    return None
 
 
 class OpenCodeExtractor(BaseExtractor):
     name = "opencode"
 
     def is_available(self) -> bool:
-        session_dir = OPENCODE_BASE / "session" / "global"
+        base = _find_opencode_storage()
+        if not base:
+            return False
+        session_dir = base / "session" / "global"
         return session_dir.exists() and any(session_dir.glob("ses_*.json"))
 
     def extract_sessions(self) -> Iterator[dict]:
-        session_dir = OPENCODE_BASE / "session" / "global"
+        base = _find_opencode_storage()
+        if not base:
+            return
+        session_dir = base / "session" / "global"
         if not session_dir.exists():
             return
 
@@ -31,7 +51,7 @@ class OpenCodeExtractor(BaseExtractor):
                 continue
 
             # Read messages
-            msg_dir = OPENCODE_BASE / "message" / sid
+            msg_dir = base / "message" / sid
             messages = []
             msg_map = {}  # msg_id -> msg dict
 
@@ -49,7 +69,7 @@ class OpenCodeExtractor(BaseExtractor):
                         ts = datetime.fromtimestamp(created / 1000, tz=timezone.utc).isoformat()
 
                     # Read parts for this message
-                    part_dir = OPENCODE_BASE / "part" / msg_id
+                    part_dir = base / "part" / msg_id
                     content_parts = []
                     if part_dir.exists():
                         for prt_file in sorted(part_dir.glob("prt_*.json")):
@@ -86,7 +106,7 @@ class OpenCodeExtractor(BaseExtractor):
             yield {
                 "id": self.make_session_id("opencode", sid),
                 "source_tool": "opencode",
-                "source_path": str(OPENCODE_BASE),
+                "source_path": str(base),
                 "project": ses.get("directory", ""),
                 "title": title,
                 "summary": "",
