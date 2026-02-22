@@ -274,21 +274,104 @@ def push():
 
 @app.command()
 def pull():
-    """Pull memory.db + core.md + context.md from configured backend."""
+    """Pull memory.db + core.md + context.md from configured backend.
+    
+    安全合并：本地未推送的 facts 不会丢失（远端优先，本地独有 facts 保留）。
+    """
     from .config import get_backend
-    from .storage.memory_db import MEMORY_DB
+    from .storage.memory_db import MEMORY_DB, list_facts, add_fact
     from .context_gen import CONTEXT_FILE, CORE_FILE
+    import shutil, tempfile
+    from pathlib import Path
 
     backend = get_backend()
     if backend.name == "local":
         console.print("[yellow]No remote backend configured.[/yellow]")
         return
 
+    # ── 1. 保存本地 facts（pull 前快照）──
+    local_facts_before = {f["id"]: f for f in list_facts()} if MEMORY_DB.exists() else {}
+
+    # ── 2. 下载远端文件（memory.db 直接覆盖）──
+    ok_files = []
     for fpath, remote_name in [(MEMORY_DB, "memory.db"), (CORE_FILE, "core.md"), (CONTEXT_FILE, "context.md")]:
         if backend.download(fpath, remote_name=remote_name):
             console.print(f"[green]✅ 下载 {remote_name}[/green]")
+            ok_files.append(remote_name)
         else:
             console.print(f"[dim]⏭ {remote_name} 未找到（跳过）[/dim]")
+
+    # ── 3. 合并：本地独有 facts 回写（防止本地未 push 的 facts 丢失）──
+    if "memory.db" in ok_files and local_facts_before:
+        remote_ids = {f["id"] for f in list_facts()}
+        local_only = [f for fid, f in local_facts_before.items() if fid not in remote_ids]
+        if local_only:
+            for f in local_only:
+                add_fact(f["scope"], f["content"], source=f.get("source", "manual"),
+                         priority=f["priority"], pinned=bool(f["pinned"]))
+            console.print(f"[cyan]🔀 合并 {len(local_only)} 条本地独有 facts（未丢失）[/cyan]")
+
+
+@app.command("status")
+def status_cmd():
+    """显示 engram 整体状态：facts 数量、文件大小、backend 连通性、上次同步时间。"""
+    from .config import get_backend, get_config
+    from .storage.memory_db import MEMORY_DB, list_facts, get_all_scopes
+    from .context_gen import CORE_FILE, CONTEXT_FILE
+    from pathlib import Path
+    import sqlite3, os
+
+    console.print("\n[bold cyan]🧠 Engram Status[/bold cyan]\n")
+
+    # ── Facts 统计 ──
+    facts = list_facts()
+    pinned = [f for f in facts if f["pinned"]]
+    scopes = get_all_scopes()
+    console.print(f"[bold]📌 Memory Facts:[/bold] {len(facts)} 条 (固定: {len(pinned)})")
+    for scope in scopes:
+        cnt = len([f for f in facts if f["scope"] == scope])
+        limit = 50 if scope == "global" else 30
+        bar = "█" * int(cnt / limit * 10)
+        console.print(f"   {scope:<25} {cnt:>3}/{limit}  {bar}")
+
+    # ── 文件状态 ──
+    console.print()
+    console.print("[bold]📂 Files:[/bold]")
+    for label, path in [("memory.db", MEMORY_DB), ("core.md", CORE_FILE), ("context.md", CONTEXT_FILE)]:
+        if path.exists():
+            size = path.stat().st_size
+            mtime = path.stat().st_mtime
+            from datetime import datetime
+            age = datetime.now() - datetime.fromtimestamp(mtime)
+            age_str = f"{int(age.total_seconds()//60)}min ago" if age.total_seconds() < 3600 else f"{int(age.total_seconds()//3600)}h ago"
+            token_hint = f" (~{size//4} token)" if label.endswith(".md") else ""
+            console.print(f"   {label:<15} {size:>7} bytes  updated {age_str}{token_hint}")
+        else:
+            console.print(f"   {label:<15} [dim]not found[/dim]")
+
+    # ── core.md 大小警告 ──
+    if CORE_FILE.exists():
+        tokens = CORE_FILE.stat().st_size // 4
+        if tokens > 80:
+            console.print(f"   [yellow]⚠️  core.md {tokens} token，接近 100 token 上限！[/yellow]")
+
+    # ── Backend 状态 ──
+    console.print()
+    cfg = get_config()
+    backend_name = cfg.get("backend", "local")
+    console.print(f"[bold]☁️  Backend:[/bold] {backend_name}")
+    if backend_name != "local":
+        repo = cfg.get("repo", "?")
+        console.print(f"   Repo: {repo}")
+        try:
+            b = get_backend()
+            ok = b.test_connection()
+            console.print(f"   Connection: {'[green]✅ OK[/green]' if ok else '[red]❌ FAIL[/red]'}")
+        except Exception as e:
+            console.print(f"   Connection: [red]❌ {e}[/red]")
+
+    console.print()
+    console.print("[dim]Run [bold]engram pull[/bold] to sync from cloud | [bold]engram push[/bold] to upload[/dim]\n")
 
 
 @app.command("facts")
