@@ -62,15 +62,18 @@ def _enforce_limit(conn, scope: str):
     count = conn.execute("SELECT COUNT(*) FROM facts WHERE scope=? AND pinned=0", (scope,)).fetchone()[0]
     if count > limit:
         to_delete = count - limit
-        conn.execute("""
-            DELETE FROM facts WHERE id IN (
-                SELECT id FROM facts
-                WHERE scope=? AND pinned=0
-                ORDER BY priority ASC, use_count ASC, created_at ASC
-                LIMIT ?
-            )
-        """, (scope, to_delete))
-        conn.commit()
+        # 先找到要删除的 id，同时清理 FTS
+        ids_to_del = [r[0] for r in conn.execute("""
+            SELECT id FROM facts
+            WHERE scope=? AND pinned=0
+            ORDER BY priority ASC, use_count ASC, created_at ASC
+            LIMIT ?
+        """, (scope, to_delete)).fetchall()]
+        if ids_to_del:
+            placeholders = ",".join("?" * len(ids_to_del))
+            conn.execute(f"DELETE FROM facts_fts WHERE id IN ({placeholders})", ids_to_del)
+            conn.execute(f"DELETE FROM facts WHERE id IN ({placeholders})", ids_to_del)
+            conn.commit()
 
 def search_facts(query: str, scope: str = None, limit: int = 10) -> list:
     conn = get_mem_db()
