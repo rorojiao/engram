@@ -149,10 +149,13 @@ def search_sessions(query: str, tool: str = None, limit: int = 10) -> list:
 
     conn = get_db()
     try:
-        params = [f'"{query}"', f'"{query}"', limit]
+        # Escape double quotes in query for FTS5 MATCH safety
+        safe_query = query.replace('"', '""')
+        fts_query = f'"{safe_query}"'
+        params = [fts_query, fts_query, limit]
         tool_filter = "AND s.source_tool = ?" if tool else ""
         if tool:
-            params = [f'"{query}"', f'"{query}"', tool, limit]
+            params = [fts_query, fts_query, tool, limit]
         
         rows = conn.execute(f"""
             SELECT DISTINCT s.*, snippet(messages_fts, 1, '[', ']', '...', 20) as snippet
