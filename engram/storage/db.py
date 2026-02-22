@@ -323,3 +323,18 @@ def semantic_search(query: str, limit: int = 10) -> list:
         return results
     finally:
         conn.close()
+
+
+def get_sessions_since(since_iso: str) -> list:
+    """获取某时间点之后导入的会话。"""
+    conn = get_db()
+    try:
+        rows = conn.execute("""
+            SELECT id, source_tool, project, title, summary, imported_at
+            FROM sessions
+            WHERE imported_at > ?
+            ORDER BY imported_at DESC
+        """, (since_iso,)).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()

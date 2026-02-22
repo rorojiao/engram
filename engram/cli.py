@@ -39,6 +39,22 @@ def sync(verbose: bool = typer.Option(False, "--verbose", "-v")):
     
     console.print(f"\n[bold green]✨ Done! Imported {total} sessions total.[/bold green]")
     console.print("Run [bold]engram search <query>[/bold] to find anything.")
+
+    # 自动提炼 facts + 更新 context.md
+    from .extractor_facts import auto_extract_from_new_sessions
+    from .context_gen import update_context_files
+    from .storage.db import get_sessions_since
+    from datetime import datetime, timedelta
+
+    since = (datetime.utcnow() - timedelta(days=1)).isoformat()
+    new_sessions = get_sessions_since(since)
+    if new_sessions:
+        extracted = auto_extract_from_new_sessions(new_sessions)
+        if extracted:
+            console.print(f"🧠 自动提炼 {extracted} 条记忆")
+
+    results = update_context_files()
+    console.print(f"📄 context.md 已更新（{len(results)} 个文件）")
     
     # Backend sync
     from .config import get_backend
@@ -135,14 +151,21 @@ def show(session_id: str):
         console.print(f"\n[{role_color}][{msg['role'].upper()}][/{role_color}]")
         console.print(msg["content"][:500])
 
-@app.command()
-def remember(content: str, tags: str = typer.Option("", help="Comma-separated tags")):
-    """Save a memory snippet to Engram."""
-    from .storage.db import init_db, add_memory
-    init_db()
-    tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
-    mid = add_memory(content, tags=tag_list)
-    console.print(f"[green]✅ Memory saved (id={mid})[/green]")
+@app.command("remember")
+def remember(
+    content: str = typer.Argument(help="要记住的内容"),
+    scope: str = typer.Option("global", "--scope", "-s", help="作用域：global 或 project:名称"),
+    priority: int = typer.Option(3, "--priority", "-p", help="优先级 1-5"),
+    pin: bool = typer.Option(False, "--pin", help="固定（永远出现在 context.md）"),
+    tags: str = typer.Option("", help="Comma-separated tags (legacy)"),
+):
+    """保存一条记忆到 memory.db。"""
+    from engram.storage.memory_db import add_fact
+    fid = add_fact(scope=scope, content=content, priority=priority, pinned=pin)
+    scope_label = f"[cyan]{scope}[/cyan]"
+    pin_label = " 📌 [已固定]" if pin else ""
+    console.print(f"✅ 已记住（{scope_label}）{pin_label}: {content[:60]}...")
+    console.print(f"   ID: {fid}")
 
 @app.command()
 def serve():
@@ -230,6 +253,62 @@ def pull():
         console.print(f"[green]✅ Pulled from {backend.name}[/green]")
     else:
         console.print(f"[red]❌ Pull from {backend.name} failed[/red]")
+
+
+@app.command("facts")
+def list_fact_cmd(
+    scope: str = typer.Option(None, "--scope", "-s", help="过滤 scope"),
+    pinned: bool = typer.Option(False, "--pinned", help="只显示固定记忆"),
+):
+    """列出 memory.db 中的记忆事实。"""
+    from engram.storage.memory_db import list_facts, get_all_scopes
+    from rich.table import Table
+
+    facts = list_facts(scope=scope, pinned_only=pinned)
+    if not facts:
+        console.print("[dim]暂无记忆[/dim]")
+        return
+
+    table = Table(show_header=True, header_style="bold cyan")
+    table.add_column("ID", width=12)
+    table.add_column("Scope", width=20)
+    table.add_column("内容", width=50)
+    table.add_column("P", width=3)
+    table.add_column("📌", width=3)
+
+    for f in facts:
+        table.add_row(
+            f["id"],
+            f["scope"],
+            f["content"][:50],
+            str(f["priority"]),
+            "✓" if f["pinned"] else "",
+        )
+    console.print(table)
+    console.print(f"\n共 {len(facts)} 条记忆")
+
+
+@app.command("context")
+def context_cmd(
+    update: bool = typer.Option(False, "--update", help="重新生成 context.md 文件"),
+    show: bool = typer.Option(False, "--show", help="显示当前 context.md 内容"),
+):
+    """管理 context.md 文件（用于文件注入）。"""
+    from engram.context_gen import update_context_files, CONTEXT_FILE
+
+    if update:
+        results = update_context_files()
+        console.print("✅ context.md 已更新：")
+        for r in results:
+            console.print(f"   {r}")
+        console.print(f"\n📄 全局文件：{CONTEXT_FILE}")
+    elif show:
+        if CONTEXT_FILE.exists():
+            console.print(CONTEXT_FILE.read_text())
+        else:
+            console.print("[dim]context.md 不存在，请先运行 engram context --update[/dim]")
+    else:
+        console.print("用法：engram context --update  或  engram context --show")
 
 
 if __name__ == "__main__":

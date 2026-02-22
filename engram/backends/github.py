@@ -80,22 +80,58 @@ class GiteeBackend(BaseBackend):
         )
         return r.json().get("sha") if r.status_code == 200 else None
 
-    def upload(self, local_path: Path) -> bool:
+    def _get_sha_for(self, filename: str):
+        r = requests.get(
+            f"{self.api_base}/repos/{self.repo}/contents/{filename}",
+            params=self._params(), timeout=15
+        )
+        if r.status_code == 200:
+            data = r.json()
+            if isinstance(data, dict):
+                return data.get("sha")
+        return None
+
+    def _upload_file(self, local_path: Path, remote_name: str) -> bool:
         try:
             content = base64.b64encode(local_path.read_bytes()).decode()
-            sha = self._get_sha()
+            sha = self._get_sha_for(remote_name)
             payload = {"message": "engram sync", "content": content, "access_token": self.token}
             if sha:
                 payload["sha"] = sha
             method = requests.put if sha else requests.post
             r = method(
-                f"{self.api_base}/repos/{self.repo}/contents/{self.filename}",
+                f"{self.api_base}/repos/{self.repo}/contents/{remote_name}",
                 json=payload, timeout=30
             )
             return r.status_code in (200, 201)
         except Exception as e:
-            print(f"Upload failed: {e}")
+            print(f"Upload {remote_name} failed: {e}")
             return False
+
+    def upload(self, local_path: Path) -> bool:
+        # Also upload sync_files from config
+        import json
+        from pathlib import Path as P
+        config_path = P.home() / ".engram" / "config.json"
+        sync_files = []
+        try:
+            cfg = json.loads(config_path.read_text())
+            sync_files = cfg.get("sync_files", [])
+        except:
+            pass
+
+        success = True
+        if sync_files:
+            engram_dir = P.home() / ".engram"
+            for fname in sync_files:
+                fpath = engram_dir / fname
+                if fpath.exists():
+                    if not self._upload_file(fpath, fname):
+                        success = False
+        else:
+            # Fallback: upload engram.db
+            success = self._upload_file(local_path, self.filename)
+        return success
 
     def download(self, local_path: Path) -> bool:
         try:
