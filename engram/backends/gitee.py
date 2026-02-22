@@ -1,9 +1,4 @@
-"""Gitee backend for Engram sync."""
-from .github import GitHubBackend
-
-
-class GiteeBackend(GitHubBackend):
-    name = "gitee"
-
-    def __init__(self, token: str, repo: str):
-        super().__init__(token, repo, host="gitee")
+"""Gitee backend — see github.py GiteeBackend (this file is kept for import compatibility)."""
+# GiteeBackend is implemented in github.py and imported by config.py
+# This file exists for backward compatibility only
+from .github import GiteeBackend  # noqa: F401

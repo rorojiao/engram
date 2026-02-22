@@ -55,16 +55,9 @@ def sync(verbose: bool = typer.Option(False, "--verbose", "-v")):
 
     results = update_context_files()
     console.print(f"📄 context.md 已更新（{len(results)} 个文件）")
-    
-    # Backend sync
-    from .config import get_backend
-    backend = get_backend()
-    if backend.name != "local":
-        from .storage.db import DB_PATH
-        if backend.upload(DB_PATH):
-            console.print(f"☁️  Synced to {backend.name}")
-        else:
-            console.print(f"⚠️  Upload to {backend.name} failed")
+
+    # 注意：sync 不上传任何文件（engram.db 可能几十MB）
+    # 用 `engram push` 显式推送 memory.db + core.md + context.md
 
 @app.command()
 def search(query: str, tool: str = typer.Option(None, "--tool", "-t"), limit: int = 10):
@@ -310,6 +303,12 @@ def pull():
                 add_fact(f["scope"], f["content"], source=f.get("source", "manual"),
                          priority=f["priority"], pinned=bool(f["pinned"]))
             console.print(f"[cyan]🔀 合并 {len(local_only)} 条本地独有 facts（未丢失）[/cyan]")
+
+    # ── 4. 重新生成 context 文件（core.md / context.md 已被新版覆盖）──
+    if ok_files:
+        from .context_gen import update_context_files
+        update_context_files()
+        console.print("[dim]🔄 context 文件已同步更新[/dim]")
 
 
 @app.command("status")

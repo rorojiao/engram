@@ -39,14 +39,8 @@ SKIP_PROJECT_DIRS = {
     "unknown",
 }
 
-# 有意义的项目目录前缀（这些下面的才是真实项目）
-MEANINGFUL_PROJECT_PATHS = [
-    "/home/msdn/engram",
-    "/home/msdn/freqtrade",
-    "/home/msdn/gamezipper",
-    "/home/msdn/game-",
-    "/home/msdn/catch-",
-]
+# 用户 home 目录（动态，跨平台）
+_HOME = str(Path.home())
 
 
 def _is_noise(text: str) -> bool:
@@ -66,18 +60,26 @@ def _detect_project(session: dict) -> str:
     if not project:
         return None
 
-    # 检查是否是有意义的项目路径
-    for meaningful in MEANINGFUL_PROJECT_PATHS:
-        if project.startswith(meaningful):
-            name = os.path.basename(project.rstrip("/"))
-            if name and name not in SKIP_PROJECT_DIRS:
-                return name
+    # 规范化路径，去掉末尾斜杠
+    project = project.rstrip("/")
 
-    # 取路径最后一段
-    name = os.path.basename(project.rstrip("/"))
-    if name in SKIP_PROJECT_DIRS:
-        return None  # 跳过无意义目录
-    if len(name) < 2:
+    # 必须在用户 home 下的子目录，且不是 home 本身
+    if not project.startswith(_HOME + "/"):
+        # 不在 home 下（例如 /root/ 或相对路径），用目录名判断
+        name = os.path.basename(project)
+        if name in SKIP_PROJECT_DIRS or len(name) < 2:
+            return None
+        return name
+
+    # 取相对于 home 的路径，例如 /home/msdn/engram → engram
+    rel = project[len(_HOME) + 1:]  # "engram" 或 "projects/engram"
+    parts = rel.split("/")
+    if not parts:
+        return None
+
+    # 取第一级目录名作为项目名
+    name = parts[0]
+    if name in SKIP_PROJECT_DIRS or len(name) < 2:
         return None
 
     return name

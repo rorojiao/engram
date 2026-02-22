@@ -6,11 +6,11 @@ class BaseBackend(ABC):
     name: str = "base"
 
     @abstractmethod
-    def upload(self, local_path: Path) -> bool:
+    def upload(self, local_path: Path, remote_name: str = None) -> bool:
         pass
 
     @abstractmethod
-    def download(self, local_path: Path) -> bool:
+    def download(self, local_path: Path, remote_name: str = None) -> bool:
         pass
 
     @abstractmethod

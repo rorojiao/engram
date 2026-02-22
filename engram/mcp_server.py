@@ -52,12 +52,14 @@ async def list_tools() -> list[types.Tool]:
         ),
         types.Tool(
             name="add_memory",
-            description="Add a memory snippet to Engram. Useful for saving important context, decisions, or learnings.",
+            description="Add a memory fact to Engram memory.db (synced to cloud). Use scope='global' for cross-project rules, scope='project:NAME' for project-specific facts.",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "content": {"type": "string", "description": "Memory content to store"},
-                    "tags": {"type": "array", "items": {"type": "string"}, "description": "Optional tags"}
+                    "scope": {"type": "string", "description": "Scope: 'global' or 'project:name'", "default": "global"},
+                    "priority": {"type": "integer", "description": "1-5, default 3", "default": 3},
+                    "pin": {"type": "boolean", "description": "Pin to core.md (always loaded)", "default": False},
                 },
                 "required": ["content"]
             }
@@ -100,8 +102,16 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
             tool=arguments.get("tool"),
             limit=arguments.get("limit", 10)
         )
+        # 同时搜索 memory.db facts（跨工具共享的精炼记忆）
+        from .storage.memory_db import search_facts
+        facts = search_facts(arguments["query"], limit=8)
         memories = search_memories(arguments["query"], limit=5)
-        result = {"sessions": sessions, "memories": memories, "total": len(sessions) + len(memories)}
+        result = {
+            "facts": [{"id": f["id"], "scope": f["scope"], "content": f["content"]} for f in facts],
+            "sessions": sessions,
+            "memories": memories,
+            "total": len(facts) + len(sessions) + len(memories),
+        }
         return [types.TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))]
     
     elif name == "list_sessions":
@@ -119,11 +129,17 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
         return [types.TextContent(type="text", text=json.dumps(session, ensure_ascii=False, indent=2))]
     
     elif name == "add_memory":
-        mid = add_memory(
-            arguments["content"],
-            tags=arguments.get("tags", [])
+        # 写到 memory_db.py 的 facts 表（可 engram facts 查看，可 push 同步）
+        from .storage.memory_db import add_fact
+        scope = arguments.get("scope", "global")
+        fid = add_fact(
+            scope=scope,
+            content=arguments["content"],
+            source="mcp",
+            priority=arguments.get("priority", 3),
+            pinned=bool(arguments.get("pin", False)),
         )
-        return [types.TextContent(type="text", text=json.dumps({"id": mid, "status": "saved"}))]
+        return [types.TextContent(type="text", text=json.dumps({"id": fid, "scope": scope, "status": "saved"}))]
     
     elif name == "sync_sessions":
         from .storage.db import upsert_session
