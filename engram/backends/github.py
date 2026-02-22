@@ -24,7 +24,7 @@ class GitHubBackend(BaseBackend):
             return r.json().get("sha")
         return None
 
-    def upload(self, local_path: Path) -> bool:
+    def upload(self, local_path: Path, remote_name: str = None) -> bool:
         try:
             content = base64.b64encode(local_path.read_bytes()).decode()
             sha = self._get_file_sha()
@@ -38,7 +38,7 @@ class GitHubBackend(BaseBackend):
             print(f"Upload failed: {e}")
             return False
 
-    def download(self, local_path: Path) -> bool:
+    def download(self, local_path: Path, remote_name: str = None) -> bool:
         try:
             url = f"{self.api_base}/repos/{self.repo}/contents/{self.filename}"
             r = requests.get(url, headers=self.headers, timeout=15)

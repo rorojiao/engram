@@ -38,6 +38,9 @@ def _make_id(scope: str, content: str) -> str:
     return hashlib.md5(f"{scope}:{content[:100]}".encode()).hexdigest()[:12]
 
 def add_fact(scope: str, content: str, source: str = "manual", priority: int = 3, pinned: bool = False) -> str:
+    if not content or not content.strip():
+        raise ValueError("content 不能为空")
+    content = content.strip()
     conn = get_mem_db()
     fid = _make_id(scope, content)
     try:

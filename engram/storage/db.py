@@ -96,12 +96,13 @@ def upsert_session(session: dict) -> str:
     conn = get_db()
     try:
         sid = session["id"]
-        messages = session.pop("messages", [])
+        messages = session.get("messages", [])   # 修复: get 不 pop，不破坏调用方的 dict
+        session_data = {k: v for k, v in session.items() if k != "messages"}  # 安全副本
         conn.execute("""
             INSERT OR REPLACE INTO sessions 
             (id, source_tool, source_path, project, title, summary, message_count, created_at, tags)
             VALUES (:id, :source_tool, :source_path, :project, :title, :summary, :message_count, :created_at, :tags)
-        """, {**session, "tags": json.dumps(session.get("tags", [])), "message_count": len(messages)})
+        """, {**session_data, "tags": json.dumps(session_data.get("tags", [])), "message_count": len(messages)})
         
         # Clean old messages and FTS entries
         conn.execute("DELETE FROM messages_fts WHERE session_id = ?", (sid,))
@@ -157,9 +158,9 @@ def search_sessions(query: str, tool: str = None, limit: int = 10) -> list:
             SELECT DISTINCT s.*, snippet(messages_fts, 1, '[', ']', '...', 20) as snippet
             FROM sessions s
             JOIN messages_fts mf ON mf.session_id = s.id
-            WHERE messages_fts MATCH ? OR s.id IN (
+            WHERE (messages_fts MATCH ? OR s.id IN (
                 SELECT id FROM sessions_fts WHERE sessions_fts MATCH ?
-            )
+            ))
             {tool_filter}
             ORDER BY s.imported_at DESC
             LIMIT ?
@@ -167,12 +168,15 @@ def search_sessions(query: str, tool: str = None, limit: int = 10) -> list:
         fts_results = [dict(r) for r in rows]
     except:
         q = f"%{query}%"
-        rows = conn.execute("""
+        tool_clause = "AND s.source_tool = ?" if tool else ""
+        extra_params = [tool] if tool else []
+        rows = conn.execute(f"""
             SELECT DISTINCT s.* FROM sessions s
             JOIN messages m ON m.session_id = s.id
-            WHERE m.content LIKE ? OR s.title LIKE ? OR s.summary LIKE ?
+            WHERE (m.content LIKE ? OR s.title LIKE ? OR s.summary LIKE ?)
+            {tool_clause}
             ORDER BY s.imported_at DESC LIMIT ?
-        """, (q, q, q, limit)).fetchall()
+        """, (q, q, q, *extra_params, limit)).fetchall()
         fts_results = [dict(r) for r in rows]
     finally:
         conn.close()

@@ -81,6 +81,9 @@ def _detect_project(session: dict) -> str:
     name = parts[0]
     if name in SKIP_PROJECT_DIRS or len(name) < 2:
         return None
+    # 跳过隐藏目录（以 . 开头，如 .openclaw、.config、.local 等系统目录）
+    if name.startswith("."):
+        return None
 
     return name
 
