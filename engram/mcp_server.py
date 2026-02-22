@@ -68,6 +68,18 @@ async def list_tools() -> list[types.Tool]:
             inputSchema={"type": "object", "properties": {}}
         ),
         types.Tool(
+            name="semantic_search",
+            description="Semantic/vector search across all AI conversations. Better than keyword search for conceptual queries.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string"},
+                    "limit": {"type": "integer", "default": 10}
+                },
+                "required": ["query"]
+            }
+        ),
+        types.Tool(
             name="get_context_summary",
             description="Get a summary of recent activity across all tools for a given project.",
             inputSchema={
@@ -126,6 +138,11 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
         total = sum(counts.values())
         return [types.TextContent(type="text", text=json.dumps({"synced": counts, "total": total}))]
     
+    elif name == "semantic_search":
+        from .storage.db import semantic_search
+        results = semantic_search(arguments.get("query", ""), arguments.get("limit", 10))
+        return [types.TextContent(type="text", text=json.dumps(results[:5], ensure_ascii=False, indent=2))]
+
     elif name == "get_context_summary":
         sessions = list_sessions(project=arguments.get("project"), limit=arguments.get("limit", 5))
         summary_lines = []

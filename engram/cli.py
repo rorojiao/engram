@@ -39,6 +39,16 @@ def sync(verbose: bool = typer.Option(False, "--verbose", "-v")):
     
     console.print(f"\n[bold green]✨ Done! Imported {total} sessions total.[/bold green]")
     console.print("Run [bold]engram search <query>[/bold] to find anything.")
+    
+    # Backend sync
+    from .config import get_backend
+    backend = get_backend()
+    if backend.name != "local":
+        from .storage.db import DB_PATH
+        if backend.upload(DB_PATH):
+            console.print(f"☁️  Synced to {backend.name}")
+        else:
+            console.print(f"⚠️  Upload to {backend.name} failed")
 
 @app.command()
 def search(query: str, tool: str = typer.Option(None, "--tool", "-t"), limit: int = 10):
@@ -158,6 +168,39 @@ def config():
     console.print("\n[bold]📋 Add this to your MCP config (claude_desktop_config.json / .cursor/mcp.json):[/bold]\n")
     console.print(json.dumps(config_json, indent=2))
     console.print("\n[dim]Then run: engram sync[/dim]")
+
+@app.command("config-backend")
+def config_backend(
+    backend: str = typer.Argument(help="local|github|gitee|webdav|s3"),
+    token: str = typer.Option(None, help="GitHub/Gitee PAT token"),
+    repo: str = typer.Option(None, help="owner/repo"),
+    url: str = typer.Option(None, help="WebDAV URL"),
+    username: str = typer.Option(None, help="WebDAV username"),
+    password: str = typer.Option(None, help="WebDAV password"),
+    endpoint_url: str = typer.Option(None, help="S3 endpoint URL"),
+    access_key: str = typer.Option(None, help="S3 access key"),
+    secret_key: str = typer.Option(None, help="S3 secret key"),
+    bucket: str = typer.Option(None, help="S3 bucket name"),
+):
+    """Configure sync backend (local/github/gitee/webdav/s3)."""
+    from .config import save_config, get_backend as _get_backend
+    config = {"backend": backend}
+    if token: config["token"] = token
+    if repo: config["repo"] = repo
+    if url: config["url"] = url
+    if username: config["username"] = username
+    if password: config["password"] = password
+    if endpoint_url: config["endpoint_url"] = endpoint_url
+    if access_key: config["access_key"] = access_key
+    if secret_key: config["secret_key"] = secret_key
+    if bucket: config["bucket"] = bucket
+    save_config(config)
+    b = _get_backend()
+    if b.test_connection():
+        console.print(f"✅ Backend '{backend}' configured and reachable")
+    else:
+        console.print(f"⚠️  Backend '{backend}' configured but connection test failed")
+
 
 if __name__ == "__main__":
     app()

@@ -1,91 +1,134 @@
-"""Extract conversations from Cursor (app data SQLite)."""
+"""Extract conversations from Cursor (workspaceStorage state.vscdb)."""
 import sqlite3
 import json
 import os
+import platform
 from pathlib import Path
 from typing import Iterator
 from .base import BaseExtractor
-import platform
 
-def _cursor_dirs() -> list[Path]:
+
+def _workspace_storage_dir() -> Path | None:
     system = platform.system()
     home = Path.home()
+    candidates = []
     if system == "Darwin":
-        return [home / "Library" / "Application Support" / "Cursor" / "User" / "globalStorage" / "storage.db",
-                home / "Library" / "Application Support" / "Cursor" / "User" / "workspaceStorage"]
+        candidates.append(home / "Library" / "Application Support" / "Cursor" / "User" / "workspaceStorage")
     elif system == "Linux":
-        return [home / ".config" / "Cursor" / "User" / "globalStorage",
-                home / ".config" / "cursor" / "User" / "globalStorage"]
+        candidates.append(home / ".config" / "Cursor" / "User" / "workspaceStorage")
     elif system == "Windows":
         appdata = Path(os.environ.get("APPDATA", home / "AppData" / "Roaming"))
-        return [appdata / "Cursor" / "User" / "globalStorage"]
-    return []
+        candidates.append(appdata / "Cursor" / "User" / "workspaceStorage")
+    for c in candidates:
+        if c.exists():
+            return c
+    return None
+
 
 class CursorExtractor(BaseExtractor):
     name = "cursor"
-    
+
     def is_available(self) -> bool:
-        return any(p.exists() for p in _cursor_dirs())
-    
+        d = _workspace_storage_dir()
+        return d is not None and d.exists()
+
     def extract_sessions(self) -> Iterator[dict]:
-        for base_path in _cursor_dirs():
-            if not base_path.exists():
+        ws_dir = _workspace_storage_dir()
+        if not ws_dir:
+            return
+
+        for db_path in ws_dir.glob("*/state.vscdb"):
+            try:
+                conn = sqlite3.connect(str(db_path))
+                row = conn.execute(
+                    "SELECT value FROM ItemTable WHERE key = 'workbench.panel.aichat.view.aichat.chatdata'"
+                ).fetchone()
+                conn.close()
+                if not row or not row[0]:
+                    continue
+            except Exception:
                 continue
-            
-            db_files = list(base_path.glob("**/*.db")) if base_path.is_dir() else [base_path]
-            
-            for db_path in db_files:
-                if not db_path.is_file():
+
+            try:
+                data = json.loads(row[0])
+            except Exception:
+                continue
+
+            # data can be a dict with "tabs" or similar structure, or a list
+            conversations = []
+            if isinstance(data, dict):
+                # Try common structures
+                if "tabs" in data:
+                    for tab in data["tabs"]:
+                        if isinstance(tab, dict) and "chat" in tab:
+                            conversations.append(tab["chat"])
+                        elif isinstance(tab, dict) and "bubbles" in tab:
+                            conversations.append(tab)
+                elif "messages" in data:
+                    conversations.append(data)
+                elif "bubbles" in data:
+                    conversations.append(data)
+                else:
+                    # Try all values that look like conversation objects
+                    for v in data.values():
+                        if isinstance(v, list):
+                            conversations.append({"messages": v})
+            elif isinstance(data, list):
+                for item in data:
+                    if isinstance(item, dict):
+                        conversations.append(item)
+
+            workspace_hash = db_path.parent.name
+
+            for idx, conv in enumerate(conversations):
+                messages = []
+                # Try "bubbles" format (Cursor AI chat)
+                bubbles = conv.get("bubbles", [])
+                if bubbles:
+                    for b in bubbles:
+                        if not isinstance(b, dict):
+                            continue
+                        role = "assistant" if b.get("type") == "ai" or b.get("type") == "response" else "user"
+                        content = b.get("text", b.get("content", ""))
+                        if not content:
+                            continue
+                        messages.append({
+                            "role": role,
+                            "content": str(content)[:4000],
+                            "timestamp": "",
+                        })
+                else:
+                    # Try "messages" format
+                    for m in conv.get("messages", []):
+                        if not isinstance(m, dict):
+                            continue
+                        role = m.get("role", m.get("type", "user"))
+                        content = m.get("content", m.get("text", ""))
+                        if not content:
+                            continue
+                        if isinstance(content, list):
+                            content = " ".join(str(c.get("text", c)) for c in content if isinstance(c, (dict, str)))
+                        messages.append({
+                            "role": str(role),
+                            "content": str(content)[:4000],
+                            "timestamp": "",
+                        })
+
+                if not messages:
                     continue
-                
-                try:
-                    conn = sqlite3.connect(str(db_path))
-                    conn.row_factory = sqlite3.Row
-                    tables = [r[0] for r in conn.execute(
-                        "SELECT name FROM sqlite_master WHERE type='table'"
-                    ).fetchall()]
-                    
-                    chat_table = next((t for t in tables if "chat" in t.lower() or "conversation" in t.lower()), None)
-                    
-                    if chat_table:
-                        rows = conn.execute(f"SELECT * FROM {chat_table} ORDER BY rowid DESC LIMIT 100").fetchall()
-                        for row in rows:
-                            d = dict(row)
-                            raw = d.get("messages", d.get("history", d.get("content", "")))
-                            if not raw:
-                                continue
-                            
-                            messages = []
-                            try:
-                                data = json.loads(raw) if isinstance(raw, (str, bytes)) else raw
-                                if isinstance(data, list):
-                                    for m in data:
-                                        if isinstance(m, dict):
-                                            messages.append({
-                                                "role": m.get("role", "user"),
-                                                "content": str(m.get("content", m.get("text", "")))[:4000],
-                                                "timestamp": m.get("timestamp", ""),
-                                            })
-                            except:
-                                pass
-                            
-                            if not messages:
-                                continue
-                            
-                            first_user = next((m["content"] for m in messages if m["role"] == "user"), "")
-                            
-                            yield {
-                                "id": self.make_session_id("cursor", str(d.get("id", row["rowid"]))),
-                                "source_tool": "cursor",
-                                "source_path": str(db_path),
-                                "project": d.get("workspace", d.get("project", "")),
-                                "title": d.get("title", first_user[:80]),
-                                "summary": "",
-                                "created_at": d.get("created_at", d.get("timestamp", "")),
-                                "messages": messages,
-                                "tags": [],
-                            }
-                    
-                    conn.close()
-                except Exception:
-                    continue
+
+                first_user = next((m["content"] for m in messages if m["role"] == "user"), "")
+                title = conv.get("title", conv.get("name", first_user[:80] if first_user else f"cursor-{workspace_hash[:8]}-{idx}"))
+
+                unique_id = f"{workspace_hash}_{idx}"
+                yield {
+                    "id": self.make_session_id("cursor", unique_id),
+                    "source_tool": "cursor",
+                    "source_path": str(db_path),
+                    "project": "",
+                    "title": title,
+                    "summary": "",
+                    "created_at": "",
+                    "messages": messages,
+                    "tags": [],
+                }
