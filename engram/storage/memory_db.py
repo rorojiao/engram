@@ -75,21 +75,22 @@ def _enforce_limit(conn, scope: str):
 def search_facts(query: str, scope: str = None, limit: int = 10) -> list:
     conn = get_mem_db()
     try:
-        where = "WHERE f.scope = ?" if scope else ""
+        scope_filter = "AND f.scope = ?" if scope else ""
         params_base = [scope] if scope else []
         try:
             rows = conn.execute(f"""
                 SELECT f.* FROM facts f
                 JOIN facts_fts ff ON ff.id = f.id
                 WHERE facts_fts MATCH ?
-                {where}
+                {scope_filter}
                 ORDER BY f.priority DESC, f.use_count DESC
                 LIMIT ?
             """, [f'"{query}"'] + params_base + [limit]).fetchall()
         except:
+            scope_clause = "WHERE scope = ? AND" if scope else "WHERE"
             rows = conn.execute(f"""
-                SELECT * FROM facts {where.replace('f.scope','scope')}
-                {"AND" if scope else "WHERE"} content LIKE ?
+                SELECT * FROM facts
+                {scope_clause} content LIKE ?
                 ORDER BY priority DESC, use_count DESC LIMIT ?
             """, params_base + [f"%{query}%", limit]).fetchall()
         for r in rows:
