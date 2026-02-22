@@ -58,19 +58,27 @@ def generate_global_context() -> str:
             lines.append(summary)
         lines.append("")
 
-    recent = list_sessions(limit=5)
+    recent = list_sessions(limit=30)
     if recent:
-        lines.append("### 最近会话")
-        chars = 0
-        for s in recent:
-            ts = s.get("created_at", s.get("imported_at", ""))[:10]
-            title = (s.get("title") or "")[:60]
-            tool = s.get("source_tool", "")
-            line = f"- [{ts}] ({tool}) {title}"
-            chars += len(line)
-            if chars > BUDGET_CHARS["recent_activity"]:
-                break
-            lines.append(line)
+        from .extractor_facts import _is_noise, SKIP_PROJECT_DIRS
+        import os
+        clean = [
+            s for s in recent
+            if not _is_noise(s.get("title") or "")
+            and os.path.basename((s.get("project") or "").rstrip("/")) not in SKIP_PROJECT_DIRS
+        ][:5]
+        if clean:
+            lines.append("### 最近会话")
+            chars = 0
+            for s in clean:
+                ts = (s.get("created_at") or s.get("imported_at") or "")[:10]
+                title = (s.get("title") or "")[:60]
+                tool = s.get("source_tool", "")
+                line = f"- [{ts}] ({tool}) {title}"
+                chars += len(line)
+                if chars > BUDGET_CHARS["recent_activity"]:
+                    break
+                lines.append(line)
 
     return "\n".join(lines)
 
