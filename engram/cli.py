@@ -68,25 +68,40 @@ def sync(verbose: bool = typer.Option(False, "--verbose", "-v")):
 
 @app.command()
 def search(query: str, tool: str = typer.Option(None, "--tool", "-t"), limit: int = 10):
-    """Search across all AI tool conversations."""
+    """Search across all AI tool conversations AND memory facts."""
     from .storage.db import search_sessions, search_memories
-    
+    from .storage.memory_db import search_facts
+
     sessions = search_sessions(query, tool=tool, limit=limit)
     memories = search_memories(query, limit=5)
-    
-    if not sessions and not memories:
+    facts = search_facts(query, limit=8)
+
+    if not sessions and not memories and not facts:
         console.print(f"[yellow]No results for '{query}'[/yellow]")
-        console.print("Run [bold]engram sync[/bold] to import your conversations first.")
+        console.print("Tip: Run [bold]engram pull[/bold] to sync shared memory from cloud, or [bold]engram sync[/bold] to import local sessions.")
         return
-    
+
+    # 优先展示 facts（来自 memory.db，跨工具共享的精华）
+    if facts:
+        from rich.table import Table
+        table = Table(title=f"📌 Memory facts matching '{query}'", show_header=True, header_style="bold yellow")
+        table.add_column("Scope", style="cyan", width=20)
+        table.add_column("内容", style="white", width=60)
+        table.add_column("P", width=3)
+        for f in facts:
+            pin = "📌" if f.get("pinned") else ""
+            table.add_row(f["scope"], f"{pin} {f['content'][:60]}", str(f["priority"]))
+        console.print(table)
+
     if sessions:
+        from rich.table import Table
         table = Table(title=f"🔍 Sessions matching '{query}'", show_header=True)
         table.add_column("Tool", style="cyan", width=12)
         table.add_column("Title", style="white")
         table.add_column("Project", style="dim")
         table.add_column("Date", style="dim", width=12)
         table.add_column("ID", style="dim", width=18)
-        
+
         for s in sessions:
             table.add_row(
                 s["source_tool"],
@@ -96,7 +111,7 @@ def search(query: str, tool: str = typer.Option(None, "--tool", "-t"), limit: in
                 s["id"][:16],
             )
         console.print(table)
-    
+
     if memories:
         console.print("\n[bold]📌 Memory snippets:[/bold]")
         for m in memories:
