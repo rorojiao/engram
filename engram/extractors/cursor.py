@@ -39,14 +39,15 @@ class CursorExtractor(BaseExtractor):
 
         for db_path in ws_dir.glob("*/state.vscdb"):
             try:
-                conn = sqlite3.connect(str(db_path))
+                conn = sqlite3.connect(str(db_path), timeout=3)
+                conn.execute("PRAGMA journal_mode=WAL")  # avoid lock conflicts with running Cursor
                 row = conn.execute(
                     "SELECT value FROM ItemTable WHERE key = 'workbench.panel.aichat.view.aichat.chatdata'"
                 ).fetchone()
                 conn.close()
                 if not row or not row[0]:
                     continue
-            except Exception:
+            except (sqlite3.OperationalError, Exception):
                 continue
 
             try:
