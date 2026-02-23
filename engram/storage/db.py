@@ -73,7 +73,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS vec_embeddings USING vec0(
 
 def get_db() -> sqlite3.Connection:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(DB_PATH))
+    conn = sqlite3.connect(str(DB_PATH), timeout=10)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
@@ -268,67 +268,6 @@ def search_memories(query: str, limit: int = 10) -> list:
                 (f"%{query}%", limit)
             ).fetchall()
         return [dict(r) for r in rows]
-    finally:
-        conn.close()
-
-
-# --- Vector semantic search ---
-
-_model = None
-
-def _get_model():
-    global _model
-    if _model is None:
-        from fastembed import TextEmbedding
-        _model = TextEmbedding('BAAI/bge-small-en-v1.5')
-    return _model
-
-
-def add_embeddings(session_id: str, messages: list):
-    import numpy as np
-    model = _get_model()
-    chunks = [m['content'][:512] for m in messages if m.get('content')]
-    if not chunks:
-        return
-    embeddings = list(model.embed(chunks))
-    conn = get_db()
-    try:
-        conn.execute("DELETE FROM embeddings WHERE session_id = ?", (session_id,))
-        for chunk, emb in zip(chunks, embeddings):
-            conn.execute(
-                "INSERT INTO embeddings (session_id, chunk, embedding) VALUES (?, ?, ?)",
-                (session_id, chunk, np.array(emb, dtype=np.float32).tobytes())
-            )
-        conn.commit()
-    finally:
-        conn.close()
-
-
-def semantic_search(query: str, limit: int = 10) -> list:
-    import numpy as np
-    model = _get_model()
-    q_emb = list(model.embed([query]))[0]
-    q_bytes = np.array(q_emb, dtype=np.float32).tobytes()
-    conn = get_db()
-    try:
-        rows = conn.execute("""
-            SELECT e.session_id, e.chunk,
-                   vec_distance_cosine(e.embedding, ?) as dist
-            FROM embeddings e
-            ORDER BY dist ASC
-            LIMIT ?
-        """, (q_bytes, limit)).fetchall()
-        results = []
-        for r in rows:
-            session = get_session(r[0])
-            if session:
-                results.append({
-                    'session_id': r[0],
-                    'chunk': r[1],
-                    'score': 1.0 - float(r[2]),
-                    'session': session
-                })
-        return results
     finally:
         conn.close()
 
