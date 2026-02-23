@@ -255,12 +255,13 @@ def add_memory(content: str, source_tool: str = None, session_id: str = None, ta
 def search_memories(query: str, limit: int = 10) -> list:
     conn = get_db()
     try:
+        safe_query = query.replace('"', '""')
         rows = conn.execute("""
             SELECT m.* FROM memories m
             JOIN memories_fts mf ON mf.id = CAST(m.id AS TEXT)
             WHERE memories_fts MATCH ?
             ORDER BY m.created_at DESC LIMIT ?
-        """, (f'"{query}"', limit)).fetchall()
+        """, (f'"{safe_query}"', limit)).fetchall()
         if not rows:
             rows = conn.execute(
                 "SELECT * FROM memories WHERE content LIKE ? ORDER BY created_at DESC LIMIT ?",
