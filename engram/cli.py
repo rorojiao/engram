@@ -241,6 +241,8 @@ def config_backend(
         console.print(f"✅ Backend '{backend}' configured and reachable")
     else:
         console.print(f"⚠️  Backend '{backend}' configured but connection test failed")
+    if token:
+        console.print("[dim]🔒 Token 已保存到 ~/.engram/config.json（权限 600，仅本人可读）[/dim]")
 
 
 @app.command()
