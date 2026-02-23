@@ -22,14 +22,15 @@ class OpenClawExtractor(BaseExtractor):
                 messages = []
                 session_meta = {}
                 
-                for line in jsonl_file.read_text(encoding="utf-8", errors="replace").splitlines():
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        entry = json.loads(line)
-                    except:
-                        continue
+                with open(jsonl_file, "r", encoding="utf-8", errors="replace") as fh:
+                    for line in fh:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            entry = json.loads(line)
+                        except:
+                            continue
                     
                     entry_type = entry.get("type", "")
                     
