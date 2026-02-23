@@ -26,9 +26,12 @@ class GitHubBackend(BaseBackend):
 
     def upload(self, local_path: Path, remote_name: str = None) -> bool:
         try:
+            fname = remote_name or self.filename
             content = base64.b64encode(local_path.read_bytes()).decode()
-            sha = self._get_file_sha()
-            url = f"{self.api_base}/repos/{self.repo}/contents/{self.filename}"
+            url = f"{self.api_base}/repos/{self.repo}/contents/{fname}"
+            # Get SHA for this specific file
+            r = requests.get(url, headers=self.headers, timeout=15)
+            sha = r.json().get("sha") if r.status_code == 200 else None
             payload = {"message": "engram sync", "content": content}
             if sha:
                 payload["sha"] = sha
@@ -40,7 +43,8 @@ class GitHubBackend(BaseBackend):
 
     def download(self, local_path: Path, remote_name: str = None) -> bool:
         try:
-            url = f"{self.api_base}/repos/{self.repo}/contents/{self.filename}"
+            fname = remote_name or self.filename
+            url = f"{self.api_base}/repos/{self.repo}/contents/{fname}"
             r = requests.get(url, headers=self.headers, timeout=15)
             if r.status_code != 200:
                 return False
