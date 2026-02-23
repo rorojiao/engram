@@ -164,13 +164,20 @@ def show(session_id: str):
 
 @app.command("remember")
 def remember(
-    content: str = typer.Argument(help="要记住的内容"),
+    content: str = typer.Argument(None, help="要记住的内容（省略则从 stdin 读取）"),
     scope: str = typer.Option("global", "--scope", "-s", help="作用域：global 或 project:名称"),
     priority: int = typer.Option(3, "--priority", "-p", help="优先级 1-5"),
     pin: bool = typer.Option(False, "--pin", help="固定（永远出现在 context.md）"),
     tags: str = typer.Option("", help="Comma-separated tags (legacy)"),
 ):
-    """保存一条记忆到 memory.db。"""
+    """保存一条记忆到 memory.db。支持从 stdin 读取长文本：echo "长内容" | engram remember"""
+    import sys
+    if content is None:
+        if not sys.stdin.isatty():
+            content = sys.stdin.read().strip()
+        if not content:
+            console.print("[red]请提供要记住的内容（参数或 stdin）[/red]")
+            raise typer.Exit(1)
     from engram.storage.memory_db import add_fact
     fid = add_fact(scope=scope, content=content, priority=priority, pinned=pin)
     scope_label = f"[cyan]{scope}[/cyan]"
