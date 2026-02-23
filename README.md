@@ -1,132 +1,54 @@
+![Version](https://img.shields.io/badge/version-0.2.1-blue)
+[![PyPI](https://img.shields.io/pypi/v/engram-mcp)](https://pypi.org/project/engram-mcp/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+
 # 🧠 Engram
 
 > Your AI tools share a brain.
 
-[![PyPI](https://img.shields.io/pypi/v/engram-mcp)](https://pypi.org/project/engram-mcp/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-
-**Stop re-explaining your codebase every session.** Engram gives Claude Code, Cursor, OpenCode, and OpenClaw a shared memory — so what one tool learns, all tools know.
+**A bidirectional memory layer for AI coding tools.** What Claude Code learns, Cursor already knows. What you explain in OpenCode, OpenClaw remembers. Stop re-explaining your codebase every session.
 
 <p align="center">
   <img src="docs/demo.svg" alt="Engram Demo" width="600">
 </p>
 
-## Why Engram?
+## ✨ Features
 
-Every time you switch between AI coding tools, you lose context:
+- 🔄 **Bidirectional sync** across Claude Code, Cursor, OpenCode, and OpenClaw
+- 🏠 **Local-first** — your memories stay on your machine (SQLite + FTS5 + vector)
+- ☁️ **Cloud backup** via GitHub, Gitee, or WebDAV — sync across machines
+- 🔍 **Semantic search** — vector embeddings + full-text search find anything instantly
+- 🌐 **Chrome extension** — import from ChatGPT, Claude.ai, Gemini, DeepSeek, and more
+- 🔌 **Native MCP server** — works with any MCP-compatible AI tool
+- 📦 **Zero config** — one `pip install`, one command, done
+- 🆓 **Free and open source** — MIT licensed, forever
 
-- 😤 Claude Code learned your naming conventions → **Cursor doesn't know**
-- 😤 OpenCode figured out your project structure → **Claude Code forgot**
-- 😤 You spend 5 minutes re-explaining things that were **already explained**
-
-Engram fixes this. **One install. 15 seconds to set up. Works forever.**
-
-## How It Works
-
-```
-You explain once  →  Engram remembers  →  All your AI tools know
-```
-
-```
-┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
-│ Claude Code  │  │   Cursor    │  │  OpenCode   │  │  OpenClaw   │
-└──────┬───────┘  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘
-       │                 │                │                │
-       └─────────────────┴────────────────┴────────────────┘
-                                │
-                    ┌───────────▼───────────┐
-                    │    🧠 Engram Memory    │
-                    │  SQLite + FTS5 + Vec  │
-                    └───────────────────────┘
-```
-
-- 🔄 **Bidirectional sync** — Claude Code ↔ Cursor ↔ OpenCode ↔ OpenClaw
-- 🔒 **Local-first** — all data stays on your machine
-- ☁️ **Optional cloud sync** — via private GitHub / Gitee / WebDAV repo
-- ⚡ **15-second setup** — one command per tool
-- 🔍 **Semantic search** — vector embeddings + full-text search find anything
-
-## Quick Start
-
-### 1. Install
+## 🚀 Quick Start
 
 ```bash
+# Install
 pip install engram-mcp
-```
 
-### 2. Import your conversations
+# Import all your existing AI conversations
+engram sync
 
-```bash
-engram sync     # auto-detects Claude Code, Cursor, OpenCode, OpenClaw
-```
+# Connect to your tools (prints config JSON to paste)
+engram config
 
-### 3. Connect to your AI tools (MCP)
-
-```bash
-engram config   # prints the JSON snippet — paste it into your tool's config
-```
-
-That's it. Your AI tools now share a brain.
-
-## What Can You Do?
-
-```bash
-# Save a fact your AI should always know
-engram remember "We use BEM naming for CSS classes" --scope project:myapp
-
-# Search across ALL your AI conversations
-engram search "redis connection pooling"
-
-# List recent sessions from every tool
-engram ls
-
-# See everything Engram knows
-engram facts
-
-# Cloud sync (optional)
+# Optional: cloud sync
 engram config-backend github --token ghp_xxx --repo you/engram-sync
 engram push
 ```
 
-## Supported Tools
+**That's it.** Your AI tools now share a brain.
 
-### Coding Agents (via CLI extractors)
+## 🔧 Tool Integration
 
-| Tool | Auto-detect | Format |
-|------|:-----------:|--------|
-| **Claude Code** | ✅ | JSONL conversations |
-| **Cursor** | ✅ | SQLite workspace storage |
-| **OpenCode** | ✅ | JSON session files |
-| **OpenClaw** | ✅ | JSONL agent logs |
-| **Codex CLI** | ✅ | — |
+<details>
+<summary><b>Claude Code</b></summary>
 
-### Web AI (via Chrome Extension)
-
-| Platform | Import | Live Snapshot |
-|----------|:------:|:------------:|
-| ChatGPT | ✅ | ✅ |
-| Claude.ai | ✅ | ✅ |
-| Gemini | — | ✅ |
-| DeepSeek | ✅ | ✅ |
-| Perplexity | — | ✅ |
-| Grok | — | ✅ |
-| 豆包 / 千问 / 通义 | ✅ | ✅ |
-
-## MCP Server
-
-Engram exposes these tools to any MCP-compatible AI:
-
-| Tool | What it does |
-|------|-------------|
-| `search_memory` | Semantic + keyword search across everything |
-| `add_memory` | Save facts, decisions, learnings |
-| `list_sessions` | Browse sessions by tool or project |
-| `get_session` | Full conversation replay |
-| `sync_sessions` | Import latest from all tools |
-| `get_context_summary` | Activity summary for a project |
-
-### Config for Claude Code / Cursor / OpenClaw
+Add to your MCP config (`.claude/mcp.json` or project settings):
 
 ```json
 {
@@ -139,54 +61,125 @@ Engram exposes these tools to any MCP-compatible AI:
 }
 ```
 
-## How It's Different
+Or reference in `CLAUDE.md`:
+```
+@engram search "your query" for cross-tool context
+```
+</details>
 
-| | **Engram** | Mem0 | Letta (MemGPT) | ChatShuttle |
-|---|---|---|---|---|
-| **Focus** | AI coding tools | General AI memory | Stateful agents | Chat backup |
-| **Works with** | Claude Code, Cursor, OpenCode, OpenClaw + web AI | Custom apps | Custom agents | ChatGPT only |
-| **Setup** | `pip install` + one command | API keys + hosted | Complex setup | Chrome extension |
-| **Data location** | 100% local (SQLite) | Cloud API | Local or cloud | Cloud |
-| **Search** | Vector + FTS5 hybrid | Vector only | Vector only | Basic |
-| **MCP support** | ✅ Native | ❌ | ❌ | ❌ |
-| **Price** | Free & open source | Freemium | Free (complex) | Paid |
+<details>
+<summary><b>Cursor</b></summary>
 
-## Cloud Sync (Optional)
+Add to `.cursor/mcp.json`:
 
-Keep your memory in sync across machines:
-
-```bash
-# GitHub
-engram config-backend github --token ghp_xxx --repo you/engram-sync
-
-# Gitee (for users in China)
-engram config-backend gitee --token xxx --repo you/engram-sync
-
-# WebDAV
-engram config-backend webdav --url https://dav.example.com --username user --password pass
-
-# Push / Pull
-engram push
-engram pull
+```json
+{
+  "mcpServers": {
+    "engram": {
+      "command": "python3",
+      "args": ["-m", "engram.mcp_server"]
+    }
+  }
+}
 ```
 
-## FAQ
+Cursor's workspace storage is auto-detected by `engram sync`.
+</details>
 
-**Q: Does my code get sent anywhere?**
-No. Engram reads local conversation logs and stores everything in a local SQLite database. Cloud sync only uploads the memory database — never your source code.
+<details>
+<summary><b>OpenCode</b></summary>
 
-**Q: Can I use it with just one tool?**
-Yes. Even with a single tool, Engram gives you persistent memory across sessions and semantic search over your conversation history.
+Add the same MCP config to OpenCode's settings. Session files are auto-detected by `engram sync`.
+</details>
 
-**Q: How is this different from CLAUDE.md / .cursorrules?**
-Those are static files you maintain manually. Engram is dynamic — it learns from your conversations and makes knowledge searchable across tools automatically.
+<details>
+<summary><b>OpenClaw</b></summary>
 
-## Links
+Add MCP server config or use file injection. Agent logs are auto-detected by `engram sync`.
+</details>
+
+## 📖 How It Works
+
+```
+┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
+│ Claude Code  │  │   Cursor    │  │  OpenCode   │  │  OpenClaw   │
+└──────┬───────┘  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘
+       │                 │                │                │
+       └────── remember ─┴──── search ────┴──── sync ─────┘
+                                │
+                    ┌───────────▼───────────┐
+                    │    🧠 Engram Memory    │
+                    │  SQLite + FTS5 + Vec  │
+                    └───────────┬───────────┘
+                                │  push / pull
+                    ┌───────────▼───────────┐
+                    │  GitHub / Gitee / DAV  │
+                    └───────────────────────┘
+```
+
+1. **You work** with any supported AI tool as usual
+2. **Engram syncs** conversations into a local semantic database
+3. **Any tool** can search and recall memories from all other tools
+4. **Cloud sync** (optional) keeps multiple machines in sync
+
+## ⚡ CLI Commands
+
+```bash
+engram sync                    # Import from all detected tools
+engram search "redis pooling"  # Semantic + keyword search
+engram remember "Use BEM CSS"  # Save a persistent fact
+engram ls                      # List recent sessions
+engram facts                   # Show all saved facts
+engram push / pull             # Cloud sync
+engram status                  # Health check
+```
+
+## 🔌 MCP Tools
+
+| Tool | Description |
+|------|-------------|
+| `search_memory` | Semantic + keyword search across everything |
+| `add_memory` | Save facts, decisions, learnings |
+| `list_sessions` | Browse sessions by tool or project |
+| `get_session` | Full conversation replay |
+| `sync_sessions` | Import latest from all tools |
+| `get_context_summary` | Activity summary for a project |
+
+## 🏆 How It's Different
+
+| | **Engram** | Mem0 | Letta Code | ChatShuttle | Augment |
+|---|---|---|---|---|---|
+| **Cross-tool sync** | ✅ 4 tools + web AI | ❌ | ❌ Single agent | ❌ ChatGPT only | ❌ Proprietary |
+| **Bidirectional** | ✅ | — | — | ❌ One-way | — |
+| **Local-first** | ✅ SQLite | ❌ Cloud API | ✅ | ❌ Cloud | ❌ Cloud |
+| **MCP native** | ✅ | ❌ | ❌ | ❌ | ❌ |
+| **Setup time** | 15 seconds | API keys | Complex | Extension | Enterprise |
+| **Price** | **Free forever** | Freemium | Free | Paid | Enterprise |
+
+## 🗺️ Roadmap
+
+- **Phase 1:** Community — reach 500 GitHub stars, stabilize MCP protocol
+- **Phase 2:** Cloud Pro — hosted sync, team sharing ($3/mo individual, $12/mo team)
+- **Phase 3:** MCP Marketplace — publish as a first-class MCP integration
+
+## 🤝 Contributing
+
+Contributions welcome! Here are some good first issues:
+
+- 🐛 Add support for new AI tools (Windsurf, Aider, etc.)
+- 📝 Improve documentation and examples
+- 🧪 Add test coverage
+- 🌍 i18n for CLI messages
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) or open an [issue](https://github.com/rorojiao/engram/issues).
+
+## 🔗 Links
 
 - 🌐 [Website](https://engram.gamezipper.com)
 - 📦 [PyPI](https://pypi.org/project/engram-mcp/)
 - 🐛 [Issues](https://github.com/rorojiao/engram/issues)
+- 💬 [Discussions](https://github.com/rorojiao/engram/discussions)
 
-## License
+## 📄 License
 
 MIT — use it however you want.
