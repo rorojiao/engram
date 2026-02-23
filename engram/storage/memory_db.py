@@ -27,11 +27,17 @@ CREATE VIRTUAL TABLE IF NOT EXISTS facts_fts USING fts5(
 
 SCOPE_LIMITS = {"global": 50, "project": 30}
 
+_schema_initialized = False
+
 def get_mem_db():
+    global _schema_initialized
     MEMORY_DB.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(MEMORY_DB))
+    conn = sqlite3.connect(str(MEMORY_DB), timeout=10)
     conn.row_factory = sqlite3.Row
-    conn.executescript(SCHEMA)
+    conn.execute("PRAGMA journal_mode=WAL")
+    if not _schema_initialized:
+        conn.executescript(SCHEMA)
+        _schema_initialized = True
     return conn
 
 def _make_id(scope: str, content: str) -> str:
