@@ -298,11 +298,15 @@ def pull():
     # ── 2. 下载远端文件（memory.db 直接覆盖）──
     ok_files = []
     for fpath, remote_name in [(MEMORY_DB, "memory.db"), (CORE_FILE, "core.md"), (CONTEXT_FILE, "context.md")]:
-        if backend.download(fpath, remote_name=remote_name):
-            console.print(f"[green]✅ 下载 {remote_name}[/green]")
-            ok_files.append(remote_name)
-        else:
-            console.print(f"[dim]⏭ {remote_name} 未找到（跳过）[/dim]")
+        try:
+            if backend.download(fpath, remote_name=remote_name):
+                console.print(f"[green]✅ 下载 {remote_name}[/green]")
+                ok_files.append(remote_name)
+            else:
+                console.print(f"[dim]⏭ {remote_name} 未找到（跳过）[/dim]")
+        except Exception as e:
+            console.print(f"[red]❌ 下载 {remote_name} 失败: {e}[/red]")
+            console.print("[yellow]💡 提示：网络问题可稍后重试 engram pull[/yellow]")
 
     # ── 3. 合并：本地独有 facts 回写（防止本地未 push 的 facts 丢失）──
     if "memory.db" in ok_files and local_facts_before:
