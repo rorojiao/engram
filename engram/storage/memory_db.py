@@ -86,6 +86,7 @@ def search_facts(query: str, scope: str = None, limit: int = 10) -> list:
     try:
         scope_filter = "AND f.scope = ?" if scope else ""
         params_base = [scope] if scope else []
+        safe_query = query.replace('"', '""')
         try:
             rows = conn.execute(f"""
                 SELECT f.* FROM facts f
@@ -94,7 +95,7 @@ def search_facts(query: str, scope: str = None, limit: int = 10) -> list:
                 {scope_filter}
                 ORDER BY f.priority DESC, f.use_count DESC
                 LIMIT ?
-            """, [f'"{query}"'] + params_base + [limit]).fetchall()
+            """, [f'"{safe_query}"'] + params_base + [limit]).fetchall()
         except:
             scope_clause = "WHERE scope = ? AND" if scope else "WHERE"
             rows = conn.execute(f"""
@@ -109,7 +110,7 @@ def search_facts(query: str, scope: str = None, limit: int = 10) -> list:
     finally:
         conn.close()
 
-def list_facts(scope: str = None, pinned_only: bool = False) -> list:
+def list_facts(scope: str = None, pinned_only: bool = False, limit: int = 200) -> list:
     conn = get_mem_db()
     try:
         where_parts = []
@@ -119,9 +120,11 @@ def list_facts(scope: str = None, pinned_only: bool = False) -> list:
         if pinned_only:
             where_parts.append("pinned = 1")
         where = "WHERE " + " AND ".join(where_parts) if where_parts else ""
+        params.append(limit)
         rows = conn.execute(f"""
             SELECT * FROM facts {where}
             ORDER BY pinned DESC, priority DESC, use_count DESC
+            LIMIT ?
         """, params).fetchall()
         return [dict(r) for r in rows]
     finally:
