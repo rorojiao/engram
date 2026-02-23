@@ -38,7 +38,7 @@ class GitHubBackend(BaseBackend):
             r = requests.put(url, headers=self.headers, json=payload, timeout=30)
             return r.status_code in (200, 201)
         except Exception as e:
-            print(f"Upload failed: {e}")
+            import logging; logging.getLogger("engram").warning(f"Upload failed: {e}")
             return False
 
     def download(self, local_path: Path, remote_name: str = None) -> bool:
@@ -52,7 +52,7 @@ class GitHubBackend(BaseBackend):
             local_path.write_bytes(content)
             return True
         except Exception as e:
-            print(f"Download failed: {e}")
+            import logging; logging.getLogger("engram").warning(f"Download failed: {e}")
             return False
 
     def test_connection(self) -> bool:
@@ -109,7 +109,7 @@ class GiteeBackend(BaseBackend):
             )
             return r.status_code in (200, 201)
         except Exception as e:
-            print(f"Upload {remote_name} failed: {e}")
+            import logging; logging.getLogger("engram").warning(f"Upload {remote_name} failed: {e}")
             return False
 
     def upload(self, local_path: Path, remote_name: str = None) -> bool:
@@ -132,7 +132,7 @@ class GiteeBackend(BaseBackend):
             local_path.write_bytes(content)
             return True
         except Exception as e:
-            print(f"Download {fname} failed: {e}")
+            import logging; logging.getLogger("engram").warning(f"Download {fname} failed: {e}")
             return False
 
     def test_connection(self) -> bool:

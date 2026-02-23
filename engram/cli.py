@@ -6,8 +6,19 @@ from rich.table import Table
 from rich.panel import Panel
 from rich import print as rprint
 
-app = typer.Typer(name="engram", help="🧠 Engram — Shared memory for AI coding agents")
+def _version_callback(value: bool):
+    if value:
+        from engram import __version__
+        print(f"engram {__version__}")
+        raise typer.Exit()
+
+app = typer.Typer(name="engram", help="🧠 Engram — Shared memory for AI coding agents",
+                  callback=lambda version: None)
 console = Console()
+
+@app.callback()
+def main(version: bool = typer.Option(False, "--version", "-V", callback=_version_callback, is_eager=True, help="Show version")):
+    pass
 
 @app.command()
 def sync(verbose: bool = typer.Option(False, "--verbose", "-v")):

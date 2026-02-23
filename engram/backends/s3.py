@@ -21,7 +21,7 @@ class S3Backend(BaseBackend):
             self.s3.upload_file(str(local_path), self.bucket, self.key)
             return True
         except Exception as e:
-            print(f"S3 upload failed: {e}")
+            import logging; logging.getLogger("engram").warning(f"S3 upload failed: {e}")
             return False
 
     def download(self, local_path: Path) -> bool:
@@ -29,7 +29,7 @@ class S3Backend(BaseBackend):
             self.s3.download_file(self.bucket, self.key, str(local_path))
             return True
         except Exception as e:
-            print(f"S3 download failed: {e}")
+            import logging; logging.getLogger("engram").warning(f"S3 download failed: {e}")
             return False
 
     def test_connection(self) -> bool:

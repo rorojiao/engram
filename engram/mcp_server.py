@@ -155,8 +155,19 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
         return [types.TextContent(type="text", text=json.dumps({"synced": counts, "total": total}))]
     
     elif name == "semantic_search":
-        from .storage.db import semantic_search
-        results = semantic_search(arguments.get("query", ""), arguments.get("limit", 10))
+        from .storage.vector import vector_search
+        from .storage.db import get_db
+        session_ids = vector_search(arguments.get("query", ""), limit=arguments.get("limit", 10))
+        results = []
+        if session_ids:
+            conn = get_db()
+            try:
+                for sid in session_ids:
+                    row = conn.execute("SELECT * FROM sessions WHERE id = ?", (sid,)).fetchone()
+                    if row:
+                        results.append(dict(row))
+            finally:
+                conn.close()
         return [types.TextContent(type="text", text=json.dumps(results[:5], ensure_ascii=False, indent=2))]
 
     elif name == "get_context_summary":

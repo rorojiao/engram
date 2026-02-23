@@ -141,9 +141,9 @@ def get_all_scopes() -> list:
 def delete_fact(fid: str) -> bool:
     conn = get_mem_db()
     try:
-        conn.execute("DELETE FROM facts WHERE id=?", (fid,))
+        cursor = conn.execute("DELETE FROM facts WHERE id=?", (fid,))
         conn.execute("DELETE FROM facts_fts WHERE id=?", (fid,))
         conn.commit()
-        return True
+        return cursor.rowcount > 0
     finally:
         conn.close()

@@ -16,7 +16,7 @@ class WebDAVBackend(BaseBackend):
             self.client.upload_file(str(local_path), self.remote_path, overwrite=True)
             return True
         except Exception as e:
-            print(f"WebDAV upload failed: {e}")
+            import logging; logging.getLogger("engram").warning(f"WebDAV upload failed: {e}")
             return False
 
     def download(self, local_path: Path) -> bool:
@@ -24,7 +24,7 @@ class WebDAVBackend(BaseBackend):
             self.client.download_file(self.remote_path, str(local_path))
             return True
         except Exception as e:
-            print(f"WebDAV download failed: {e}")
+            import logging; logging.getLogger("engram").warning(f"WebDAV download failed: {e}")
             return False
 
     def test_connection(self) -> bool:
