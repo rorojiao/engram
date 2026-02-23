@@ -407,23 +407,29 @@ def list_fact_cmd(
         console.print("[dim]暂无记忆[/dim]")
         return
 
-    table = Table(show_header=True, header_style="bold cyan")
-    table.add_column("ID", width=12)
-    table.add_column("Scope", width=20)
-    table.add_column("内容", width=50)
-    table.add_column("P", width=3)
-    table.add_column("📌", width=3)
-
+    # Group by scope for better readability
+    from collections import defaultdict
+    grouped = defaultdict(list)
     for f in facts:
-        table.add_row(
-            f["id"],
-            f["scope"],
-            f["content"][:50],
-            str(f["priority"]),
-            "✓" if f["pinned"] else "",
-        )
-    console.print(table)
-    console.print(f"\n共 {len(facts)} 条记忆")
+        grouped[f["scope"]].append(f)
+
+    for scope_name in sorted(grouped.keys()):
+        scope_facts = grouped[scope_name]
+        table = Table(title=f"📂 {scope_name}", show_header=True, header_style="bold cyan")
+        table.add_column("ID", width=12)
+        table.add_column("内容", width=50)
+        table.add_column("P", width=3)
+        table.add_column("📌", width=3)
+
+        for f in scope_facts:
+            table.add_row(
+                f["id"],
+                f["content"][:50],
+                str(f["priority"]),
+                "✓" if f["pinned"] else "",
+            )
+        console.print(table)
+    console.print(f"\n共 {len(facts)} 条记忆（{len(grouped)} 个 scope）")
 
 
 @app.command("context")
